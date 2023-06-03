@@ -13,7 +13,7 @@ dpg.setup_dearpygui()
 ID_TABLE = dpg.generate_uuid()
 
 df = get_pivot_data()
-# print(df)
+print(df)
 # print(df.columns)
 # print(df.shape)
 # print(df.index)
@@ -77,6 +77,26 @@ def get_index_map(column_map, current_keys=[], index_map={}):
 
     return index_map
 
+def add_index_recursive(column_names, depth):
+    # called inside a row
+
+    if depth < len(column_names)-1:
+        with dpg.table(parent=dpg.last_item(), header_row=True, resizable=True):
+            dpg.add_table_column(label=column_names[depth])
+            with dpg.table_row():
+                add_index_recursive(column_names, depth+1)
+    else:
+        with dpg.table(header_row=True, resizable=True):
+            for name in df.index.names:
+                dpg.add_table_column(label=name)
+            prev_keytuple = None
+            for keytuple in df.index:
+                with dpg.table_row():
+                    for i in range(len(df.index.names)):
+                        label = keytuple[i] if prev_keytuple is None or keytuple[i] != prev_keytuple[i] else ""
+                        dpg.add_selectable(label=label)
+                    prev_keytuple = keytuple
+
 
 def add_data_recursive(column_map, keys):
     """
@@ -106,6 +126,10 @@ def add_data_recursive(column_map, keys):
                 with dpg.table_row():
                     add_data_recursive(column_map, keys + [key])  
             else:
+                # multi-index offset row 
+                # with dpg.table_row():
+                #     for i in range(8):
+                #         dpg.add_text("")
                 # if the values of nx_level are strings, write table 
                 for row_index in range(df.shape[0]):
                     with dpg.table_row():
@@ -115,7 +139,7 @@ def add_data_recursive(column_map, keys):
                             grid_selector.widget_grid[row_index][absolute_column_index] = cell
                             grid_selector.dpg_lookup[row_index][absolute_column_index] = [
                                 dpg.get_item_parent(dpg.get_item_parent(cell)), 
-                                row_index,
+                                row_index , # offset for multi-index row
                                 relative_column_index # + len(df.index[0])
                             ]
 
@@ -132,8 +156,10 @@ with dpg.window(tag="window", width=700, height=400):
         
         # first level name
         dpg.add_table_column(label=df.columns.names[0])
+        # dpg.add_table_column(label="")
         # first level values
         top_level = column_map.keys()
+        
         for key0 in top_level:
             dpg.add_table_column(label=key0)
 
@@ -141,16 +167,8 @@ with dpg.window(tag="window", width=700, height=400):
         with dpg.table_row():
             
             # insert df.index into first column
-            with dpg.table(header_row=True, resizable=True):
-                for name in df.index.names:
-                    dpg.add_table_column(label=name)
-                prev_keytuple = None
-                for keytuple in df.index:
-                    with dpg.table_row():
-                        for i in range(len(df.index.names)):
-                            label = keytuple[i] if prev_keytuple is None or keytuple[i] != prev_keytuple[i] else ""
-                            dpg.add_selectable(label=label)
-                        prev_keytuple = keytuple
+            column_names = df.columns.names[1:]
+            add_index_recursive(column_names, 0)
 
             add_data_recursive(column_map, keys=[])
 

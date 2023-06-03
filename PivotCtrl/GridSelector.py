@@ -113,10 +113,12 @@ class GridSelector:
                     dpg.set_value(self.widget_grid[j][i], False)
 
             return row, column
+        else:
+            return None, None
                     
 
     def on_mouse_up(self, sender, app_data):
-        is_dragging_range = False
+        self.is_dragging_range = False
         row, column = self.on_mouse_drag(sender, app_data)
         print(f"Address: {column}, {row}")
 
