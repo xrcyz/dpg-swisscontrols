@@ -57,22 +57,26 @@ class GridSelector:
         self.table_id = table_id
         self.width = width
         self.height = height
-        self.widget_grid = []
+        # self.widget_grid = []
+        self.widget_grid = [[None for _ in range(width)] for _ in range(height)]
+        self.dpg_lookup = [[(0,0,0) for _ in range(width)] for _ in range(height)] # [table_id, i, j] for each cell
         self.mouse_drag_coords = [[0,0], [0,0]] # pixel coords
         self.range_coords = [[0,0], [0,0]] # index coords
         self.is_dragging_range = False
         self.mouse_registry = -1
         with dpg.handler_registry() as mouse_registry:
             self.mouse_registry = mouse_registry
+            # dpg.add_mouse_click_handler(button=dpg.mvMouseButton_Left, callback=self.test)
             dpg.add_mouse_click_handler(button=dpg.mvMouseButton_Left, callback=self.on_mouse_down)
             dpg.add_mouse_release_handler(button=dpg.mvMouseButton_Left, callback=self.on_mouse_up)
             dpg.add_mouse_drag_handler(button=dpg.mvMouseButton_Left, callback=self.on_mouse_drag)
-
+        
     def __del__(self):
         self.deregister()
 
     def on_mouse_down(self, sender, app_data):
         # test if mouse inside table bounding box
+    
         rect_min = dpg.get_item_rect_min(self.widget_grid[0][0])
         rect_max = dpg.get_item_rect_max(self.widget_grid[-1][-1])
         mouse_pos = dpg.get_mouse_pos(local=False)
@@ -80,11 +84,11 @@ class GridSelector:
             self.mouse_drag_coords[0] = mouse_pos
             self.is_dragging_range = True
             widget_widths = [dpg.get_item_rect_size(w)[0]+1 for w in self.widget_grid[0]]
-            widget_heights = [dpg.get_item_rect_size(w)[1] for w in self.widget_grid[1]]
+            widget_heights = [dpg.get_item_rect_size(r[0])[1] for r in self.widget_grid]
             column = int(np.searchsorted(np.cumsum(widget_widths), mouse_pos[0] - rect_min[0]))
             row = int(np.searchsorted(np.cumsum(widget_heights), mouse_pos[1] - rect_min[1]))
             self.range_coords[0] = [column, row]
-            # print(f"Address: {column}, {row}")
+            print(f"Address: {column}, {row}")
 
     def on_mouse_drag(self, sender, app_data):
         # Get the ending position of the drag
@@ -94,23 +98,27 @@ class GridSelector:
         if(self.is_dragging_range and (rect_min[0] < mouse_pos[0] < rect_max[0]) and (rect_min[1] < mouse_pos[1] < rect_max[1])):
             self.mouse_drag_coords[1] = mouse_pos
             widget_widths = [dpg.get_item_rect_size(w)[0]+1 for w in self.widget_grid[0]]
-            widget_heights = [dpg.get_item_rect_size(w)[1] for w in self.widget_grid[1]]
+            widget_heights = [dpg.get_item_rect_size(r[0])[1] for r in self.widget_grid]
             column = int(np.searchsorted(np.cumsum(widget_widths), mouse_pos[0] - rect_min[0]))
             row = int(np.searchsorted(np.cumsum(widget_heights), mouse_pos[1] - rect_min[1]))
             self.range_coords[1] = [column, row]
-            # print(f"Address: {column}, {row}")
 
-            for i,j in itertools.product(range(self.width), range(self.height)):
+            for j,i in itertools.product(range(self.height), range(self.width)):
+                
+                table_id, table_j, table_i = self.dpg_lookup[j][i]
                 if if_between(self.range_coords[0][0], i, self.range_coords[1][0]) and if_between(self.range_coords[0][1], j, self.range_coords[1][1]):
-                    dpg.highlight_table_cell(self.table_id, j, i, [34, 83, 118, 100])
+                    dpg.highlight_table_cell(table_id, table_j, table_i, [34, 83, 118, 100])
                 else:
-                    dpg.unhighlight_table_cell(self.table_id, j, i)
+                    dpg.unhighlight_table_cell(table_id, table_j, table_i)
                     dpg.set_value(self.widget_grid[j][i], False)
+
+            return row, column
                     
 
     def on_mouse_up(self, sender, app_data):
         is_dragging_range = False
-        self.on_mouse_drag(sender, app_data)
+        row, column = self.on_mouse_drag(sender, app_data)
+        print(f"Address: {column}, {row}")
 
     def deregister(self):
         dpg.delete_item(self.mouse_registry)

@@ -35,7 +35,7 @@ def get_pivot_data():
     # Create DataFrame
     df = pd.DataFrame({
         'Fruit': fruits,
-        # 'Coord': coord,
+        'Coord': coord,
         'Grade': grade,
         'Year': years,
         'Month': months,
@@ -44,8 +44,8 @@ def get_pivot_data():
     })
 
     # Perform groupby, sum and unstack operations
-    df_grouped = (df.groupby(['Fruit', 'Grade', 'Year', 'Month'])
-                  .sum()
+    df_grouped = (df.groupby(['Fruit', 'Grade', 'Coord', 'Year', 'Month'])
+                  .sum(numeric_only=True)
                   .unstack(['Fruit', 'Grade'])
                   .swaplevel(0, 1, axis=1)
                   .sort_index(axis=1)

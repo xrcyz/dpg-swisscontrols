@@ -4,10 +4,13 @@ import pandas as pd
 import numpy as np
 import itertools
 from PivotData import get_pivot_data
+from GridSelector import GridSelector
 
 dpg.create_context()
 dpg.create_viewport(title='Custom Title', width=800, height=600)
 dpg.setup_dearpygui()
+
+ID_TABLE = dpg.generate_uuid()
 
 df = get_pivot_data()
 # print(df)
@@ -50,6 +53,30 @@ def get_column_map(df):
 
     return lookup
 
+def get_index_map(column_map, current_keys=[], index_map={}):
+    """
+    Recursively create an index map for a nested column structure.
+    
+    Args:
+    column_map (dict): The column map dict.
+    current_keys (list): The current position within the column map, at each level of the hierarchy.
+    index_map (dict): The index map to populate. This is also the return value.
+    
+    Returns:
+    dict: The populated index map, mapping indices to positions.
+    """
+    current_level = column_map
+    for key in current_keys:
+        current_level = current_level[key]
+        
+    for key, value in current_level.items():
+        if isinstance(value, dict):
+            get_index_map(column_map, current_keys + [key], index_map)
+        else:
+            index_map[value] = current_keys + [key]
+
+    return index_map
+
 
 def add_data_recursive(column_map, keys):
     """
@@ -82,16 +109,25 @@ def add_data_recursive(column_map, keys):
                 # if the values of nx_level are strings, write table 
                 for row_index in range(df.shape[0]):
                     with dpg.table_row():
-                        for column_index in nx_level.values():
-                            val = df.iloc[row_index, column_index]
-                            dpg.add_selectable(label="{:.2f}".format(val))
+                        for relative_column_index, absolute_column_index in enumerate(nx_level.values()):
+                            val = df.iloc[row_index, absolute_column_index]
+                            cell = dpg.add_selectable(label="{:.2f}".format(val))
+                            grid_selector.widget_grid[row_index][absolute_column_index] = cell
+                            grid_selector.dpg_lookup[row_index][absolute_column_index] = [
+                                dpg.get_item_parent(dpg.get_item_parent(cell)), 
+                                row_index,
+                                relative_column_index # + len(df.index[0])
+                            ]
 
 
 
 column_map = get_column_map(df)
 # print(column_map)
+index_to_column_names = get_index_map(column_map)
+# print(index_map)  
+grid_selector = GridSelector(ID_TABLE, width=df.shape[1], height=df.shape[0])
 
-with dpg.window(tag="window", width=700, height=600):
+with dpg.window(tag="window", width=700, height=400):
     with dpg.table(header_row=True, resizable=True, borders_outerH=True, borders_outerV=True):
         
         # first level name
@@ -118,118 +154,16 @@ with dpg.window(tag="window", width=700, height=600):
 
             add_data_recursive(column_map, keys=[])
 
+# i think we need some map from the cell to [parent_id, i, j]
+# also when we build the widget_grid, we need to map from 
+# we can get the local column index from len(nx_level.values())
+# and the row is just row_index
+# 
+# cell = grid_selector.widget_grid[8][1]
+# parent_table = dpg.get_item_parent(dpg.get_item_parent(cell))
+# print(dpg.highlight_table_cell(parent_table, 10, 1, [34, 83, 118, 100]))
+# print(dpg.get_item_info(cell))
 
-
-with dpg.window(tag="Table", width=700, height=400, pos=[300,300]):
-    with dpg.table(header_row=True, resizable=True, borders_outerH=True, borders_outerV=True):
-        dpg.add_table_column(label="Section")
-        dpg.add_table_column(label="Fruit")
-        dpg.add_table_column(label="Vegetables")
-
-        # a single row that contains all data in the table
-        with dpg.table_row():
-            # index column
-            with dpg.table(header_row=True):
-                dpg.add_table_column(label="Product")
-
-                with dpg.table_row():
-                    with dpg.table(header_row=True, resizable=True):
-                                dpg.add_table_column(label="Year")
-                                dpg.add_table_column(label="Month")
-
-                                with dpg.table_row():
-                                    dpg.add_selectable(label="2022")
-                                    dpg.add_selectable(label="Nov")
-                                with dpg.table_row():
-                                    dpg.add_selectable(label="")
-                                    dpg.add_selectable(label="Dec")
-                                with dpg.table_row():
-                                    dpg.add_selectable(label="2023")
-                                    dpg.add_selectable(label="Jan")
-                                with dpg.table_row():
-                                    dpg.add_selectable(label="")
-                                    dpg.add_selectable(label="Feb")
-                            
-
-            # multiindex column 1
-            with dpg.table(header_row=True, resizable=True):
-                dpg.add_table_column(label="Apples")
-                dpg.add_table_column(label="Oranges")
-
-                with dpg.table_row():
-                    with dpg.table(header_row=True, resizable=True):
-                        dpg.add_table_column(label="Volume")
-                        dpg.add_table_column(label="Weight")
-
-                        with dpg.table_row():
-                            dpg.add_selectable(label="5")
-                            dpg.add_selectable(label="10")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="15")
-                            dpg.add_selectable(label="20")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="5")
-                            dpg.add_selectable(label="10")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="15")
-                            dpg.add_selectable(label="20")
-
-                    with dpg.table(header_row=True, resizable=True):
-                        dpg.add_table_column(label="Volume")
-                        dpg.add_table_column(label="Weight")
-
-                        with dpg.table_row():
-                            dpg.add_selectable(label="5")
-                            dpg.add_selectable(label="10")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="15")
-                            dpg.add_selectable(label="20")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="5")
-                            dpg.add_selectable(label="10")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="15")
-                            dpg.add_selectable(label="20")
-                
-            # multiindex column 2
-            with dpg.table(header_row=True, resizable=True):
-                dpg.add_table_column(label="Avacados")
-                dpg.add_table_column(label="Chillies")
-
-                with dpg.table_row():
-                    with dpg.table(header_row=True, resizable=True):
-                        dpg.add_table_column(label="Volume")
-                        dpg.add_table_column(label="Weight")
-
-                        with dpg.table_row():
-                            dpg.add_selectable(label="5")
-                            dpg.add_selectable(label="10")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="15")
-                            dpg.add_selectable(label="20")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="5")
-                            dpg.add_selectable(label="10")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="15")
-                            dpg.add_selectable(label="20")
-                            
-                    with dpg.table(header_row=True, resizable=True):
-                        dpg.add_table_column(label="Volume")
-                        dpg.add_table_column(label="Weight")
-
-                        with dpg.table_row():
-                            dpg.add_selectable(label="5")
-                            dpg.add_selectable(label="10")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="15")
-                            dpg.add_selectable(label="20")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="5")
-                            dpg.add_selectable(label="10")
-                        with dpg.table_row():
-                            dpg.add_selectable(label="15")
-                            dpg.add_selectable(label="20")
 
 dpg.show_viewport()
 
