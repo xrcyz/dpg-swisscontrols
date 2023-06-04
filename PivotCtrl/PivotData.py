@@ -26,7 +26,7 @@ def get_pivot_data():
 
     # Random years and months
     years = random.choices([2022, 2023], k=n_rows)
-    months = random.choices(np.arange(1,5), k=n_rows)
+    quarters = random.choices(np.arange(1,5), k=n_rows)
 
     # Random weights and volumes
     weights = np.random.rand(n_rows)
@@ -38,16 +38,16 @@ def get_pivot_data():
         # 'Coord': coord,
         'Grade': grade,
         'Year': years,
-        'Month': months,
+        'Quarter': quarters,
         'Weight': weights,
         'Volume': volumes
     })
 
     # Perform groupby, sum and unstack operations
-    df_grouped = (df.groupby(['Fruit', 'Grade', 'Year', 'Month'])
+    df_grouped = (df.groupby(['Fruit', 'Grade', 'Year', 'Quarter'])
                   .sum(numeric_only=True)
                   .unstack(['Fruit', 'Grade'])
-                  .swaplevel(0, 1, axis=1)
+                  .reorder_levels([1, 2, 0], axis=1)
                   .sort_index(axis=1)
                   .fillna(0)
     )

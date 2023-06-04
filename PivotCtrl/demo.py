@@ -81,12 +81,12 @@ def add_index_recursive(column_names, depth):
     # called inside a row
 
     if depth < len(column_names)-1:
-        with dpg.table(parent=dpg.last_item(), header_row=True, resizable=True):
+        with dpg.table(parent=dpg.last_item(), header_row=True, resizable=True, no_host_extendX=True):
             dpg.add_table_column(label=column_names[depth])
             with dpg.table_row():
                 add_index_recursive(column_names, depth+1)
     else:
-        with dpg.table(header_row=True, resizable=True):
+        with dpg.table(header_row=True, resizable=True, no_host_extendX=True):
             for name in df.index.names:
                 dpg.add_table_column(label=name)
             prev_keytuple = None
@@ -116,7 +116,9 @@ def add_data_recursive(column_map, keys):
     # implicitly, we are in a row at this step
     # adding a table to each column in the row
     for key in current_level.keys():
-        with dpg.table(header_row=True, resizable=True):
+        with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
+                   row_background=False, no_host_extendX=True, no_pad_innerX=False,
+                   borders_outerH=True, borders_innerV=True):
             nx_level = current_level[key]
             for nx_key in nx_level:
                 dpg.add_table_column(label=nx_key)
@@ -152,7 +154,45 @@ index_to_column_names = get_index_map(column_map)
 grid_selector = GridSelector(ID_TABLE, width=df.shape[1], height=df.shape[0])
 
 with dpg.window(tag="window", width=700, height=400):
-    with dpg.table(header_row=True, resizable=True, borders_outerH=True, borders_outerV=True):
+    
+    with dpg.collapsing_header(label="Configure"):
+        with dpg.child_window(height=235):
+            with dpg.group(horizontal=False):
+
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Filter", width=80)
+                    dpg.add_child_window(height=40, width=-1)
+                        
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Rows", width=80)
+                    with dpg.child_window(height=40, width=-1):
+                        with dpg.group(horizontal=True):
+                            dpg.add_button(label="Year")
+                            dpg.add_button(label="Quarter")
+
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Columns", width=80)
+                    with dpg.child_window(height=40, width=-1):
+                        with dpg.group(horizontal=True):
+                            dpg.add_button(label="Fruit")
+                            dpg.add_button(label="Grade")
+
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Data", width=80)
+                    with dpg.child_window(height=40, width=-1):
+                        with dpg.group(horizontal=True):
+                            dpg.add_button(label="Volume")
+                            dpg.add_button(label="Weight")
+
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Transpose", width=80)
+                    with dpg.child_window(height=40, width=-1):
+                        with dpg.group(horizontal=True):
+                            dpg.add_checkbox(label="Transpose")
+
+    with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
+                   row_background=False, no_host_extendX=True, no_pad_innerX=False,
+                   borders_outerH=True, borders_innerV=True):
         
         # first level name
         dpg.add_table_column(label=df.columns.names[0])
