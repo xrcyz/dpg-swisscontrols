@@ -20,9 +20,9 @@ def get_pivot_data():
     n_rows = 100
 
     # Random fruits
-    coord = random.choices(["X", "Y", "Z"], k=n_rows)
+    energy = random.choices(["High", "Low"], k=n_rows)
     fruits = random.choices(["Apple", "Pear"], k=n_rows)
-    grade = random.choices(["A", "B"], k=n_rows)
+    grade = random.choices(["Round", "Square"], k=n_rows)
 
     # Random years and months
     years = random.choices([2022, 2023], k=n_rows)
@@ -35,8 +35,8 @@ def get_pivot_data():
     # Create DataFrame
     df = pd.DataFrame({
         'Fruit': fruits,
-        # 'Coord': coord,
-        'Grade': grade,
+        # 'Energy': energy,
+        'Shape': grade,
         'Year': years,
         'Quarter': quarters,
         'Weight': weights,
@@ -44,13 +44,13 @@ def get_pivot_data():
     })
 
     # Perform groupby, sum and unstack operations
-    df_grouped = (df.groupby(['Fruit', 'Grade', 'Year', 'Quarter'])
+    df_grouped = (df.groupby(['Fruit', 'Shape', 'Year', 'Quarter'])
                   .sum(numeric_only=True)
-                  .unstack(['Fruit', 'Grade'])
+                  .unstack(['Fruit', 'Shape'])
                   .reorder_levels([1, 2, 0], axis=1)
                   .sort_index(axis=1)
                   .fillna(0)
     )
-    df_grouped.columns.names = ['Fruit', 'Field', 'Grade']
+    df_grouped.columns.names = ['Fruit', 'Field', 'Shape']
     return df_grouped
 

@@ -3,7 +3,8 @@ import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
 import itertools
-from PivotData import get_pivot_data
+import dataclasses
+from DataSource import get_pivot_data
 from GridSelector import GridSelector
 
 dpg.create_context()
@@ -118,7 +119,7 @@ def add_data_recursive(column_map, keys):
     for key in current_level.keys():
         with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
                    row_background=False, no_host_extendX=True, no_pad_innerX=False,
-                   borders_outerH=True, borders_innerV=True):
+                   borders_outerH=False, borders_innerV=True):
             nx_level = current_level[key]
             for nx_key in nx_level:
                 dpg.add_table_column(label=nx_key)
@@ -156,40 +157,141 @@ grid_selector = GridSelector(ID_TABLE, width=df.shape[1], height=df.shape[0])
 
 # ===========================
 
-def on_tag_drop(drop_sender, drag_data):
-    drop_children = dpg.get_item_children(drop_sender, 1)
-    drop_grp = drop_children[0] 
-    # print(f"Dropped {drag_data} onto {drop_grp}")
-    # print(f"Drag config: {dpg.get_item_configuration(drag_data)}")
-    create_pivot_tag(parent=drop_grp, label=dpg.get_item_label(drag_data))
-    dpg.delete_item(drag_data)
+def swap_labels(selected_tag, forward=True):
+    parent_group = dpg.get_item_parent(selected_pivot_index)
+    children = dpg.get_item_children(parent_group, 1)
     
-def on_tag_drag(sender, app_data, user_data):
-    pass# print(f"Dragging {sender}")
+    # Ensure selected index is not the last one
+    if selected_tag in children:
+        
+        # Get the tags of the selected item and the next item
+        idx = children.index(selected_tag)
+        
+        if forward and idx == len(children) - 1:
+            return
+        if not forward and idx == 0:
+            return
+        
 
-def create_pivot_tag(parent, label):
-    drag_tag = dpg.generate_uuid()
-    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, drag_callback=on_tag_drag, payload_type="TAG")
-    with dpg.drag_payload(parent=b, payload_type="TAG", drag_data=drag_tag, drop_data="drop data"):
-        dpg.add_text(label)
+        next_tag = children[idx + (1 if forward else -1)]
+
+        # Get the labels of the selected item and the next item
+        selected_label = dpg.get_item_label(selected_tag)
+        next_label = dpg.get_item_label(next_tag)
+
+        # Swap the labels
+        dpg.set_item_label(selected_tag, label=next_label)
+        dpg.set_item_label(next_tag, label=selected_label)
+
+        on_pidx_button_press(next_tag, None, None)
+
+# ===========================
+
+@dataclasses.dataclass
+class PivotFilterButton:
+    id: str
+    field: str
+    label: str
+
+selected_pivot_index = -1
+list_of_pivot_field_selectables = []
+list_of_pivot_index_buttons = []
+list_of_pivot_filter_buttons = []
 
 def on_psel_drop(drop_sender, drag_sender):
     print(f"Dropped {drag_sender} onto {drop_sender}")
 
-def create_pivot_field(parent, label):
+    # logic for dragging from rows and columns back to selected fields
+    if drag_sender in list_of_pivot_index_buttons:
+        dpg.delete_item(drag_sender)
+        list_of_pivot_index_buttons.remove(drag_sender)
+    # logic for dragging from filters back to selected fields
+
+def on_pwhere_drop(drop_sender, drag_sender):
+    print(f"Dropped {drag_sender} onto {drop_sender}")
+
+
+
+def on_pidx_drop(drop_sender, drag_sender):
+    print(f"Dropped {drag_sender} onto {drop_sender}")
+    global list_of_pivot_index_buttons
+
+    current_buttons = list_of_pivot_index_buttons
+
+    # logic for dragging between rows and columns
+    if drag_sender in list_of_pivot_index_buttons:
+        create_pivot_idx(parent=drop_sender, label=dpg.get_item_label(drag_sender))
+        dpg.delete_item(drag_sender)
+        list_of_pivot_index_buttons.remove(drag_sender)
+    # logic for dragging from field list to rows and columns
+    elif drag_sender in list_of_pivot_field_selectables:
+        # only add field to rows and cols if not already present
+        field = dpg.get_item_label(drag_sender)
+
+        list_of_pivot_index_buttons =  [item for item in list_of_pivot_index_buttons if dpg.get_item_label(item) != field]
+
+        deletions = [item for item in current_buttons if item not in list_of_pivot_index_buttons]
+        for e in deletions:
+            dpg.delete_item(e)
+            
+        create_pivot_idx(parent=drop_sender, label=dpg.get_item_label(drag_sender))
+
+def on_pidx_drag(sender):
+    on_pidx_button_press(sender, None, None)
+
+def on_pidx_button_press(sender, app_data, user_data): 
+    global selected_pivot_index
+    # highlight the button and unhighlight the rest
+    for button in list_of_pivot_index_buttons:
+        if button == sender:
+            dpg.bind_item_theme(button, selected_button)
+            selected_pivot_index = button
+        else:
+            dpg.bind_item_theme(button, 0)
+
+def create_pivot_idx(parent, label):
     drag_tag = dpg.generate_uuid()
-    b = dpg.add_selectable(tag=drag_tag, label=label, parent=parent, payload_type="PSEL")
-    with dpg.drag_payload(parent=b, payload_type="PSEL", drag_data=drag_tag, drop_data="drop data"):
+    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW", drag_callback=on_pidx_drag, callback=on_pidx_button_press) # , width=8*len(label)
+    list_of_pivot_index_buttons.append(b)
+    with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
+        dpg.add_text(label)
+
+def create_pivot_sel(parent, label):
+    drag_tag = dpg.generate_uuid()
+    b = dpg.add_selectable(tag=drag_tag, label=label, parent=parent, payload_type="PROW")
+    list_of_pivot_field_selectables.append(b)
+    with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
+        dpg.add_text(label)
+
+def create_pivot_filter(parent, field, label):
+    drag_tag = dpg.generate_uuid()
+    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW")
+    list_of_pivot_filter_buttons.append(PivotFilterButton(id=b, field=field, label=label))
+    with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
         dpg.add_text(label)
 
 with dpg.theme() as listbox_theme:
     with dpg.theme_component(dpg.mvSelectable):
-        dpg.add_theme_color(dpg.mvThemeCol_Header, (200,119,200,153))
+        dpg.add_theme_color(dpg.mvThemeCol_Header, (0.26 * 255, 0.59 * 255, 0.98 * 255, 0.31 * 255))
     with dpg.theme_component(dpg.mvAll):
         # dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (150, 100, 100), category=dpg.mvThemeCat_Core)
         # dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (255,255,255,255), category=dpg.mvThemeCat_Core)
         dpg.add_theme_color(dpg.mvThemeCol_ChildBg, (51,51,55,255), category=dpg.mvThemeCat_Core)
 
+with dpg.theme() as transparent_button:
+    with dpg.theme_component(dpg.mvButton):
+        dpg.add_theme_color(dpg.mvThemeCol_Button, (255, 255, 255, 0))  # transparent background
+
+with dpg.theme() as selected_button:
+    with dpg.theme_component(dpg.mvButton):
+        dpg.add_theme_color(dpg.mvThemeCol_Button, (0.26 * 255, 0.59 * 255, 0.98 * 255, 0.31 * 255))  #
+        # myStyleVar_FrameRounding
+        # myStyleVar_FrameBorderSize
+        # FrameBorder
+
+def cb():
+    global selected_pivot_index
+    swap_labels(selected_tag=selected_pivot_index)
 # ===========================
 
 with dpg.window(tag="window", width=700, height=400):
@@ -197,92 +299,70 @@ with dpg.window(tag="window", width=700, height=400):
     with dpg.collapsing_header(label="Setup"):
         with dpg.child_window(height=135) as w:
             
-            with dpg.group(horizontal=False):
-                dpg.add_button(label="Select: ")
-                with dpg.group(horizontal=True):
-                    
-                    with dpg.child_window(width=80, height=90) as mylistbox:
-                        with dpg.group(horizontal=False, width=80) as g:
-                                
-                                items = ('Fruit', 'Grade', 'Year', 'Quarter', 'Volume','Weight')
-
-                                create_pivot_field(parent=g, label="Fruit")
-                                create_pivot_field(parent=g, label="Grade"  )
-                                create_pivot_field(parent=g, label="Year"   )
-                                create_pivot_field(parent=g, label="Quarter")
-                                create_pivot_field(parent=g, label="Volume" )
-                                create_pivot_field(parent=g, label="Weight" )
-                    
-                    dpg.bind_item_theme(mylistbox, listbox_theme)
-                    with dpg.table(header_row=False, policy=dpg.mvTable_SizingFixedFit):
-                        dpg.add_table_column(width=40)
-                        dpg.add_table_column()
-
-                        with dpg.table_row():
-                            dpg.add_text("Where: ")
-                            with dpg.group(horizontal=False, drop_callback= on_psel_drop, payload_type="PSEL"):
-                                dpg.add_button(label="Year is in [2021, 2022]")
-                                dpg.add_button(label="Weight > 0")
-                        with dpg.table_row():
-                            dpg.add_text("Groupby: ")
-                            with dpg.group(horizontal=False, drop_callback= on_psel_drop, payload_type="PSEL"):
-                                    with dpg.group(horizontal=True):
-                                        dpg.add_text("Rows: ", indent=10)
-                                        dpg.add_button(label="Years")
-                                        dpg.add_button(label="Quarters")
-                                    with dpg.group(horizontal=True):
-                                        dpg.add_text("Columns: ", indent=10)
-                                        dpg.add_button(label="Fruit")
-                                        dpg.add_button(label="Grade")
-            
-
-    # with dpg.collapsing_header(label="Configure"):
-    #     with dpg.child_window(height=235):
-    #         with dpg.group(horizontal=False):
-
-    #             with dpg.group(horizontal=True):
-    #                 dpg.add_button(label="Filter", width=80)
-    #                 dpg.add_child_window(height=40, width=-1, drop_callback=on_tag_drop, payload_type="TAG")
-    #                 dpg.add_group(horizontal=True, parent=dpg.last_item())
+            # ---- horizontal splot
+            with dpg.group(horizontal=True): 
+                # ---- field selector
+                with dpg.group(horizontal=False):
+                    dpg.add_button(label="Select: ")
+                    with dpg.group(horizontal=True):
                         
-    #             with dpg.group(horizontal=True):
-    #                 dpg.add_button(label="Rows", width=80)
-    #                 with dpg.child_window(height=40, width=-1, drop_callback=on_tag_drop, payload_type="TAG") as b:
-    #                     with dpg.group(horizontal=True) as c:
-    #                         create_pivot_tag(c, "Year")
-    #                         create_pivot_tag(c, "Quarter")
+                        with dpg.child_window(width=80, height=90, drop_callback= on_psel_drop, payload_type="PROW") as mylistbox:
+                            with dpg.group(horizontal=False, width=80) as g:
+                                    
+                                    items = ('Fruit', 'Grade', 'Year', 'Quarter', 'Volume','Weight')
 
-    #             with dpg.group(horizontal=True):
-    #                 dpg.add_button(label="Columns", width=80)
-    #                 with dpg.child_window(height=40, width=-1, drop_callback=on_tag_drop, payload_type="TAG") as b:
-    #                     with dpg.group(horizontal=True) as c:
-    #                         create_pivot_tag(c, "Fruit")
-    #                         create_pivot_tag(c, "Grade")
+                                    create_pivot_sel(parent=g, label="Fruit")
+                                    create_pivot_sel(parent=g, label="Grade"  )
+                                    create_pivot_sel(parent=g, label="Energy"  )
+                                    create_pivot_sel(parent=g, label="Year"   )
+                                    create_pivot_sel(parent=g, label="Quarter")
+                                    create_pivot_sel(parent=g, label="Volume" )
+                                    create_pivot_sel(parent=g, label="Weight" )
+                    
+                dpg.bind_item_theme(mylistbox, listbox_theme)
+                # --- field organiser
+                with dpg.table(header_row=False, policy=dpg.mvTable_SizingStretchProp,
+                                    no_host_extendX=True, no_pad_innerX=False,
+                                    borders_outerH=False, 
+                                    borders_outerV=False,
+                                    borders_innerV=False):
+                    dpg.add_table_column(width=40, width_fixed=True)
+                    dpg.add_table_column(width_stretch=True, init_width_or_weight=0.0)
 
-    #             with dpg.group(horizontal=True):
-    #                 dpg.add_button(label="Data", width=80)
-    #                 with dpg.child_window(height=40, width=-1, drop_callback=on_tag_drop, payload_type="TAG") as b:
-    #                     with dpg.group(horizontal=True) as c:
-    #                         create_pivot_tag(c, "Volume")
-    #                         create_pivot_tag(c, "Weight")
-    #                         # with dpg.child_window(height=80, width=-1):
-    #                         #     dpg.add_button(label="Data")
-    #                         #     with dpg.child_window(height=-1, width=-1):
-    #                         #     # dpg.add_separator()
-    #                         #         with dpg.group(horizontal=True):
-    #                         #             dpg.add_button(label="Volume")
-    #                         #             dpg.add_button(label="Weight")
+                    with dpg.table_row():
+                        dpg.add_text("Where: ")
+                        with dpg.group(horizontal=False, drop_callback= on_pwhere_drop, payload_type="PROW") as g:
+                            create_pivot_filter(parent=g, field="Year", label="Year is in [2021, 2022]")
+                            create_pivot_filter(parent=g, field="Weight", label="Weight > 0")
+                            
+                    with dpg.table_row():
+                        with dpg.group(horizontal=False):
+                            dpg.add_text("Groupby: ")
+                            with dpg.group(horizontal=True):
+                                pidx_left = dpg.add_button(arrow=True, direction=dpg.mvDir_Left)
+                                pidx_right = dpg.add_button(arrow=True, direction=dpg.mvDir_Right)
 
+                        with dpg.group(horizontal=False):
+                            with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
+                                dpg.add_text("Rows: ", indent=10)
+                                
+                                create_pivot_idx(parent=g, label="Year")
+                                create_pivot_idx(parent=g, label="Quarter")
+                                
+                            with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
+                                dpg.add_text("Columns: ", indent=10)
+                                create_pivot_idx(parent=g, label="Fruit")
+                                create_pivot_idx(parent=g, label="Grade")
+                                create_pivot_idx(parent=g, label="Data")
 
-    #             with dpg.group(horizontal=True):
-    #                 dpg.add_button(label="Transpose", width=80)
-    #                 with dpg.child_window(height=40, width=-1) as b:
-    #                     with dpg.group(horizontal=True):
-    #                         test_item = dpg.add_checkbox(label="Transpose")
+                        dpg.set_item_callback(pidx_left, lambda: swap_labels(selected_tag=selected_pivot_index, forward=False))
+                        dpg.set_item_callback(pidx_right, lambda: swap_labels(selected_tag=selected_pivot_index, forward=True))
 
     with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
                    row_background=False, no_host_extendX=True, no_pad_innerX=False,
-                   borders_outerH=True, borders_innerV=True):
+                   borders_outerH=True, 
+                   borders_outerV=True,
+                   borders_innerV=True):
         
         # first level name
         dpg.add_table_column(label=df.columns.names[0])
@@ -311,7 +391,7 @@ with dpg.window(tag="window", width=700, height=400):
 # parent_table = dpg.get_item_parent(dpg.get_item_parent(cell))
 # print(dpg.highlight_table_cell(parent_table, 10, 1, [34, 83, 118, 100]))
 # print(dpg.get_item_info(cell))
-
+print(list_of_pivot_filter_buttons)
 
 dpg.show_viewport()
 
