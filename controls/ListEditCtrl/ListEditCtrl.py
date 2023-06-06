@@ -11,18 +11,24 @@ def listEditCtrlDialog(grid: DataGrid, send_grid: Callable[[DataGrid], None]):
     :param send_grid: Callback method to the parent control. 
     """    
     # TODO - change tag to support a dialog within a dialog
-    with dpg.window(label="Modal Dialog", modal=True, show=True, tag="modal_id", no_title_bar=True, pos=dpg.get_mouse_pos(local=False), width=430, height=400):
+    with dpg.window(label="Modal Dialog", 
+                    modal=True, 
+                    show=True, 
+                    no_title_bar=True, 
+                    pos=dpg.get_mouse_pos(local=False), 
+                    width=430, 
+                    height=400) as id_modal:
         
         table_id = dpg.generate_uuid()
         get_grid = listEditCtrl(table_id, grid, height=360)
 
         def on_ok():
             send_grid(get_grid())
-            dpg.delete_item("modal_id")
+            dpg.delete_item(id_modal)
 
         with dpg.group(horizontal=True):
-            dpg.add_button(label="OK", width=75, callback=on_ok)
-            dpg.add_button(label="Cancel", width=75, callback=lambda: dpg.delete_item("modal_id"))
+            dpg.add_button(label="Accept", width=75, callback=on_ok)
+            dpg.add_button(label="Cancel", width=75, callback=lambda: dpg.delete_item(id_modal))
 
 
 def listEditCtrl(table_id, grid: DataGrid, height=-1, **kwargs):

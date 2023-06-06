@@ -2,6 +2,37 @@ import pandas as pd
 import numpy as np
 import random
 
+def get_flat_data():
+    # Number of rows to generate
+    n_rows = 100
+
+    # Random fruits
+    vibe = random.choices(["High", "Low"], k=n_rows)
+    fruits = random.choices(["Apple", "Pear"], k=n_rows)
+    grade = random.choices(["Round", "Square"], k=n_rows)
+
+    # Random years and months
+    years = random.choices([2022, 2023], k=n_rows)
+    quarters = random.choices(np.arange(1,5), k=n_rows)
+
+    # Random weights and volumes
+    weights = np.random.rand(n_rows)
+    volumes = np.random.rand(n_rows)
+    price = np.random.rand(n_rows)
+
+    # Create DataFrame
+    df = pd.DataFrame({
+        'Year': years,
+        'Quarter': quarters,
+        'Fruit': fruits,
+        'Shape': grade,
+        'Vibe': vibe,
+        'Weight': weights,
+        'Volume': volumes,
+        'Price/kg': price,
+    })
+
+    return df
 
 def get_pivot_data():
 
@@ -16,32 +47,8 @@ def get_pivot_data():
             2       2.164300  3.162353  1.964546  2.241498  6.641311  7.045404
     """
 
-    # Number of rows to generate
-    n_rows = 100
-
-    # Random fruits
-    energy = random.choices(["High", "Low"], k=n_rows)
-    fruits = random.choices(["Apple", "Pear"], k=n_rows)
-    grade = random.choices(["Round", "Square"], k=n_rows)
-
-    # Random years and months
-    years = random.choices([2022, 2023], k=n_rows)
-    quarters = random.choices(np.arange(1,5), k=n_rows)
-
-    # Random weights and volumes
-    weights = np.random.rand(n_rows)
-    volumes = np.random.rand(n_rows)
-
     # Create DataFrame
-    df = pd.DataFrame({
-        'Fruit': fruits,
-        # 'Energy': energy,
-        'Shape': grade,
-        'Year': years,
-        'Quarter': quarters,
-        'Weight': weights,
-        'Volume': volumes
-    })
+    df = get_flat_data()
 
     # Perform groupby, sum and unstack operations
     df_grouped = (df.groupby(['Fruit', 'Shape', 'Year', 'Quarter'])

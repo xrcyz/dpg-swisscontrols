@@ -5,7 +5,8 @@ import numpy as np
 import itertools
 import dataclasses
 from DataSource import get_pivot_data
-from GridSelector import GridSelector
+from .GridSelector import GridSelector
+from PivotBroker import PivotBroker
 
 dpg.create_context()
 dpg.create_viewport(title='Custom Title', width=800, height=600)
@@ -13,7 +14,12 @@ dpg.setup_dearpygui()
 
 ID_TABLE = dpg.generate_uuid()
 
-df = get_pivot_data()
+pivotBroker = PivotBroker()
+df = pivotBroker.get_pivot(filter=None, 
+                           rows=['Year', 'Quarter'], 
+                           cols=['Fruit', 'Shape'],
+                           aggs=['Volume', 'Price/kg'])
+
 # print(df)
 # print(df.columns)
 # print(df.shape)
@@ -309,15 +315,10 @@ with dpg.window(tag="window", width=700, height=400):
                         with dpg.child_window(width=80, height=90, drop_callback= on_psel_drop, payload_type="PROW") as mylistbox:
                             with dpg.group(horizontal=False, width=80) as g:
                                     
-                                    items = ('Fruit', 'Grade', 'Year', 'Quarter', 'Volume','Weight')
+                                    items = pivotBroker.get_field_list()
 
-                                    create_pivot_sel(parent=g, label="Fruit")
-                                    create_pivot_sel(parent=g, label="Grade"  )
-                                    create_pivot_sel(parent=g, label="Energy"  )
-                                    create_pivot_sel(parent=g, label="Year"   )
-                                    create_pivot_sel(parent=g, label="Quarter")
-                                    create_pivot_sel(parent=g, label="Volume" )
-                                    create_pivot_sel(parent=g, label="Weight" )
+                                    for item in items:
+                                        create_pivot_sel(parent=g, label=item)  
                     
                 dpg.bind_item_theme(mylistbox, listbox_theme)
                 # --- field organiser
@@ -341,6 +342,9 @@ with dpg.window(tag="window", width=700, height=400):
                             with dpg.group(horizontal=True):
                                 pidx_left = dpg.add_button(arrow=True, direction=dpg.mvDir_Left)
                                 pidx_right = dpg.add_button(arrow=True, direction=dpg.mvDir_Right)
+                            with dpg.group(horizontal=True):
+                                dpg.add_text("T:", indent=4)
+                                dpg.add_checkbox(default_value=True)
 
                         with dpg.group(horizontal=False):
                             with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
@@ -352,8 +356,13 @@ with dpg.window(tag="window", width=700, height=400):
                             with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
                                 dpg.add_text("Columns: ", indent=10)
                                 create_pivot_idx(parent=g, label="Fruit")
-                                create_pivot_idx(parent=g, label="Grade")
-                                create_pivot_idx(parent=g, label="Data")
+                                create_pivot_idx(parent=g, label="Shape")
+
+                            with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
+                                dpg.add_text("Data: ", indent=10)
+                                create_pivot_idx(parent=g, label="Volume")
+                                create_pivot_idx(parent=g, label="Weight")
+                                
 
                         dpg.set_item_callback(pidx_left, lambda: swap_labels(selected_tag=selected_pivot_index, forward=False))
                         dpg.set_item_callback(pidx_right, lambda: swap_labels(selected_tag=selected_pivot_index, forward=True))
