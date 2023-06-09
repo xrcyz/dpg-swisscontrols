@@ -207,6 +207,7 @@ def swap_labels(selected_tag, forward=True):
 
         on_pidx_button_press(next_tag, None, None)
 
+
 # ===========================
 
 
@@ -268,6 +269,10 @@ list_of_pivot_field_selectables = []
 list_of_pivot_index_buttons = []
 list_of_pivot_filter_buttons = []
 
+def on_pidx_swap(selected_tag, forward=True):
+    swap_labels(selected_tag, forward)
+    update_pivot()
+
 def on_psel_drop(drop_sender, drag_sender):
     print(f"Dropped {drag_sender} onto {drop_sender}")
 
@@ -277,10 +282,10 @@ def on_psel_drop(drop_sender, drag_sender):
         list_of_pivot_index_buttons.remove(drag_sender)
     # logic for dragging from filters back to selected fields
 
+    update_pivot()
+
 def on_pwhere_drop(drop_sender, drag_sender):
     print(f"Dropped {drag_sender} onto {drop_sender}")
-
-
 
 def on_pidx_drop(drop_sender, drag_sender):
     print(f"Dropped {drag_sender} onto {drop_sender}")
@@ -305,6 +310,8 @@ def on_pidx_drop(drop_sender, drag_sender):
             dpg.delete_item(e)
             
         create_pivot_idx(parent=drop_sender, label=dpg.get_item_label(drag_sender))
+
+    update_pivot()
 
 def on_pidx_drag(sender):
     on_pidx_button_press(sender, None, None)
@@ -340,6 +347,8 @@ def create_pivot_filter(parent, field, label):
     with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
         dpg.add_text(label)
 
+
+
 with dpg.theme() as listbox_theme:
     with dpg.theme_component(dpg.mvSelectable):
         dpg.add_theme_color(dpg.mvThemeCol_Header, (0.26 * 255, 0.59 * 255, 0.98 * 255, 0.31 * 255))
@@ -369,15 +378,13 @@ def delete_pivot():
         dpg.delete_item(ID_PIVOT_TABLE)
         
 
-def make_pivot():
+def update_pivot():
     delete_pivot()
     
     global grid_selector
     global df 
     global column_map
     global index_to_column_names
-
-    
 
     rows = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_ROWSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
     cols = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_COLSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
@@ -423,7 +430,7 @@ def make_pivot():
 
 with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=400):
     
-    dpg.add_button(label='Update table', callback=make_pivot)
+    dpg.add_button(label='Update table', callback=update_pivot)
     
     with dpg.collapsing_header(label="Setup"):
         with dpg.child_window(height=135) as w:
@@ -488,10 +495,10 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=400):
                                 create_pivot_idx(parent=ID_DATALIST, label="Weight")
                                 
 
-                        dpg.set_item_callback(pidx_left, lambda: swap_labels(selected_tag=selected_pivot_index, forward=False))
-                        dpg.set_item_callback(pidx_right, lambda: swap_labels(selected_tag=selected_pivot_index, forward=True))
+                        dpg.set_item_callback(pidx_left, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=False))
+                        dpg.set_item_callback(pidx_right, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=True))
 
-    make_pivot()
+    update_pivot()
 
 
 dpg.show_viewport()
