@@ -9,6 +9,15 @@ from GridSelector import GridSelector
 from PivotBroker import PivotBroker
 from ListSelectCtrl import listSelectCtrl
 
+from enum import Enum
+
+class MvItemTypes(Enum):
+    Button = 'mvAppItemType::mvButton'
+    Text = 'mvAppItemType::mvText'
+    # Add other item types as needed
+
+# print(f"Test: {MvItemTypes.Button.value == 'mvAppItemType::mvButton'}")
+
 dpg.create_context()
 dpg.create_viewport(title='Custom Title', width=800, height=600)
 dpg.setup_dearpygui()
@@ -194,28 +203,60 @@ def swap_labels(selected_tag, forward=True):
 
 # ===========================
 
+"""
+We need to be able to delete items at runtime from Select, Where and GroupBy.
+Probably makes sense to declare those IDs as local vars.
+"""
 
+ID_FIELDLIST = dpg.generate_uuid()
+ID_ROWSLIST = dpg.generate_uuid()
+ID_COLSLIST = dpg.generate_uuid()
+ID_DATALIST = dpg.generate_uuid()
 
 def select_fields():
     
+    # TODO pause gridselect when dialog launched
+
     fields = pivotBroker.get_field_list()
-    current_sel = [dpg.get_item_label(id) for id in dpg.get_item_children(id_fieldlist, 1)]
+    current_sel = [dpg.get_item_label(id) for id in dpg.get_item_children(ID_FIELDLIST, 1)]
     data = [(label in current_sel, label) for label in fields]
 
     listSelectCtrl(title="Select fields", data=data, send_data=select_fields_callback)
 
 def select_fields_callback(user_sel):
     
-    fields = dpg.get_item_children(id_fieldlist, 1)
+    # delete current field list
+    fields = dpg.get_item_children(ID_FIELDLIST, 1)
     for field in fields:
         dpg.delete_item(field)
 
+    list_of_pivot_field_selectables = []
+
+    # build field list from selection
     for sel, field in user_sel:
         if sel:
-            create_pivot_sel(parent=id_fieldlist, label=field)
+            create_pivot_sel(parent=ID_FIELDLIST, label=field)
 
-    
-    print(user_sel)
+    # delete any [rows, cols, data] if not in field list
+    fields = ['(Data)'] + [sel[1] for sel in user_sel if sel[0]]
+    row_btns = [item for item in dpg.get_item_children(ID_ROWSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
+    for btn in row_btns:
+        if(dpg.get_item_label(btn) not in fields):
+            dpg.delete_item(btn)
+            list_of_pivot_index_buttons.remove(btn)
+    col_btns = [item for item in dpg.get_item_children(ID_COLSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
+    for btn in col_btns:
+        if(dpg.get_item_label(btn) not in fields):
+            dpg.delete_item(btn)
+            list_of_pivot_index_buttons.remove(btn)
+    data_btns = [item for item in dpg.get_item_children(ID_DATALIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
+    for btn in data_btns:
+        if(dpg.get_item_label(btn) not in fields):
+            dpg.delete_item(btn)
+            list_of_pivot_index_buttons.remove(btn)
+
+
+    # print(user_sel)
 
 # ===========================
 
@@ -338,13 +379,13 @@ with dpg.window(tag="window", width=700, height=400):
                     dpg.add_button(label="Select: ", callback=select_fields)
                     with dpg.group(horizontal=True):
                         
-                        with dpg.child_window(width=80, height=90, drop_callback= on_psel_drop, payload_type="PROW") as id_listbox:
-                            with dpg.group(horizontal=False, width=80) as id_fieldlist:
+                        with dpg.child_window(tag=ID_FIELDLIST, width=80, height=90, drop_callback= on_psel_drop, payload_type="PROW") as id_listbox:
+                            with dpg.group(horizontal=False, width=80):
                                     
                                     items = pivotBroker.get_field_list()
 
                                     for item in items[:-1]:
-                                        create_pivot_sel(parent=id_fieldlist, label=item)  
+                                        create_pivot_sel(parent=ID_FIELDLIST, label=item)  
                     
                 dpg.bind_item_theme(id_listbox, listbox_theme)
                 # --- field organiser
@@ -373,22 +414,22 @@ with dpg.window(tag="window", width=700, height=400):
                             #     dpg.add_checkbox(default_value=True)
 
                         with dpg.group(horizontal=False):
-                            with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
+                            with dpg.group(tag=ID_ROWSLIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW"):
                                 dpg.add_text("Rows: ", indent=10)
                                 
-                                create_pivot_idx(parent=g, label="Year")
-                                create_pivot_idx(parent=g, label="Quarter")
+                                create_pivot_idx(parent=ID_ROWSLIST, label="Year")
+                                create_pivot_idx(parent=ID_ROWSLIST, label="Quarter")
                                 
-                            with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
+                            with dpg.group(tag=ID_COLSLIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW"):
                                 dpg.add_text("Columns: ", indent=10)
-                                create_pivot_idx(parent=g, label="Fruit")
-                                create_pivot_idx(parent=g, label="Shape")
-                                create_pivot_idx(parent=g, label="(Data)")
+                                create_pivot_idx(parent=ID_COLSLIST, label="Fruit")
+                                create_pivot_idx(parent=ID_COLSLIST, label="Shape")
+                                create_pivot_idx(parent=ID_COLSLIST, label="(Data)")
 
-                            with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
+                            with dpg.group(tag=ID_DATALIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
                                 dpg.add_text("Data: ", indent=10)
-                                create_pivot_idx(parent=g, label="Volume")
-                                create_pivot_idx(parent=g, label="Weight")
+                                create_pivot_idx(parent=ID_DATALIST, label="Volume")
+                                create_pivot_idx(parent=ID_DATALIST, label="Weight")
                                 
 
                         dpg.set_item_callback(pidx_left, lambda: swap_labels(selected_tag=selected_pivot_index, forward=False))
