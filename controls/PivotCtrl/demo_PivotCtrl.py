@@ -5,8 +5,9 @@ import numpy as np
 import itertools
 import dataclasses
 from DataSource import get_pivot_data
-from .GridSelector import GridSelector
+from GridSelector import GridSelector
 from PivotBroker import PivotBroker
+from ListSelectCtrl import listSelectCtrl
 
 dpg.create_context()
 dpg.create_viewport(title='Custom Title', width=800, height=600)
@@ -193,6 +194,31 @@ def swap_labels(selected_tag, forward=True):
 
 # ===========================
 
+
+
+def select_fields():
+    
+    fields = pivotBroker.get_field_list()
+    current_sel = [dpg.get_item_label(id) for id in dpg.get_item_children(id_fieldlist, 1)]
+    data = [(label in current_sel, label) for label in fields]
+
+    listSelectCtrl(title="Select fields", data=data, send_data=select_fields_callback)
+
+def select_fields_callback(user_sel):
+    
+    fields = dpg.get_item_children(id_fieldlist, 1)
+    for field in fields:
+        dpg.delete_item(field)
+
+    for sel, field in user_sel:
+        if sel:
+            create_pivot_sel(parent=id_fieldlist, label=field)
+
+    
+    print(user_sel)
+
+# ===========================
+
 @dataclasses.dataclass
 class PivotFilterButton:
     id: str
@@ -309,18 +335,18 @@ with dpg.window(tag="window", width=700, height=400):
             with dpg.group(horizontal=True): 
                 # ---- field selector
                 with dpg.group(horizontal=False):
-                    dpg.add_button(label="Select: ")
+                    dpg.add_button(label="Select: ", callback=select_fields)
                     with dpg.group(horizontal=True):
                         
-                        with dpg.child_window(width=80, height=90, drop_callback= on_psel_drop, payload_type="PROW") as mylistbox:
-                            with dpg.group(horizontal=False, width=80) as g:
+                        with dpg.child_window(width=80, height=90, drop_callback= on_psel_drop, payload_type="PROW") as id_listbox:
+                            with dpg.group(horizontal=False, width=80) as id_fieldlist:
                                     
                                     items = pivotBroker.get_field_list()
 
-                                    for item in items:
-                                        create_pivot_sel(parent=g, label=item)  
+                                    for item in items[:-1]:
+                                        create_pivot_sel(parent=id_fieldlist, label=item)  
                     
-                dpg.bind_item_theme(mylistbox, listbox_theme)
+                dpg.bind_item_theme(id_listbox, listbox_theme)
                 # --- field organiser
                 with dpg.table(header_row=False, policy=dpg.mvTable_SizingStretchProp,
                                     no_host_extendX=True, no_pad_innerX=False,
@@ -342,9 +368,9 @@ with dpg.window(tag="window", width=700, height=400):
                             with dpg.group(horizontal=True):
                                 pidx_left = dpg.add_button(arrow=True, direction=dpg.mvDir_Left)
                                 pidx_right = dpg.add_button(arrow=True, direction=dpg.mvDir_Right)
-                            with dpg.group(horizontal=True):
-                                dpg.add_text("T:", indent=4)
-                                dpg.add_checkbox(default_value=True)
+                            # with dpg.group(horizontal=True):
+                            #     dpg.add_text("T:", indent=4)
+                            #     dpg.add_checkbox(default_value=True)
 
                         with dpg.group(horizontal=False):
                             with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
@@ -357,6 +383,7 @@ with dpg.window(tag="window", width=700, height=400):
                                 dpg.add_text("Columns: ", indent=10)
                                 create_pivot_idx(parent=g, label="Fruit")
                                 create_pivot_idx(parent=g, label="Shape")
+                                create_pivot_idx(parent=g, label="(Data)")
 
                             with dpg.group(horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
                                 dpg.add_text("Data: ", indent=10)
@@ -400,7 +427,7 @@ with dpg.window(tag="window", width=700, height=400):
 # parent_table = dpg.get_item_parent(dpg.get_item_parent(cell))
 # print(dpg.highlight_table_cell(parent_table, 10, 1, [34, 83, 118, 100]))
 # print(dpg.get_item_info(cell))
-print(list_of_pivot_filter_buttons)
+# print(list_of_pivot_filter_buttons)
 
 dpg.show_viewport()
 

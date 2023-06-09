@@ -4,7 +4,7 @@ import numpy as np
 from ListSelectCtrl import listSelectCtrl
 
 data = []
-for i in range(50):
+for i in range(12):
     data.append((True, f"Item {i}"))
 
 user_sel = []
@@ -18,7 +18,7 @@ dpg.setup_dearpygui()
 
 with dpg.window(tag="window", width=700, height=400):
     
-    dpg.add_button(label="Select", tag=dpg.generate_uuid(), callback=lambda: listSelectCtrl(data, get_user_selection))
+    dpg.add_button(label="Select", tag=dpg.generate_uuid(), callback=lambda: listSelectCtrl("Select items", data, get_user_selection))
 
 dpg.show_viewport()
 
