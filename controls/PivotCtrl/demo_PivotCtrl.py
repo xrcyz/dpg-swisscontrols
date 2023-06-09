@@ -22,13 +22,19 @@ dpg.create_context()
 dpg.create_viewport(title='Custom Title', width=800, height=600)
 dpg.setup_dearpygui()
 
-ID_TABLE = dpg.generate_uuid()
+ID_PIVOT_PARENT = dpg.generate_uuid()
+ID_FIELDLIST = dpg.generate_uuid()
+ID_ROWSLIST = dpg.generate_uuid()
+ID_COLSLIST = dpg.generate_uuid()
+ID_DATALIST = dpg.generate_uuid()
+ID_GRID_SELECT = dpg.generate_uuid()
+ID_PIVOT_TABLE = dpg.generate_uuid()
 
 pivotBroker = PivotBroker()
 df = pivotBroker.get_pivot(filter=None, 
-                           rows=['Year', 'Quarter'], 
-                           cols=['Fruit', 'Shape'],
-                           aggs=['Volume', 'Price/kg'])
+                           rows=['Year', 'Quarter'], # '(Data)', 
+                           cols=['Fruit', 'Shape', '(Data)'],
+                           aggs=['Volume', 'Weight'])
 
 # print(df)
 # print(df.columns)
@@ -167,8 +173,8 @@ def add_data_recursive(column_map, keys):
 column_map = get_column_map(df)
 # print(column_map)
 index_to_column_names = get_index_map(column_map)
-# print(index_map)  
-grid_selector = GridSelector(ID_TABLE, width=df.shape[1], height=df.shape[0])
+# print(index_to_column_names)  
+# grid_selector = GridSelector(ID_GRID_SELECT, width=df.shape[1], height=df.shape[0])
 
 
 # ===========================
@@ -203,15 +209,6 @@ def swap_labels(selected_tag, forward=True):
 
 # ===========================
 
-"""
-We need to be able to delete items at runtime from Select, Where and GroupBy.
-Probably makes sense to declare those IDs as local vars.
-"""
-
-ID_FIELDLIST = dpg.generate_uuid()
-ID_ROWSLIST = dpg.generate_uuid()
-ID_COLSLIST = dpg.generate_uuid()
-ID_DATALIST = dpg.generate_uuid()
 
 def select_fields():
     
@@ -362,12 +359,71 @@ with dpg.theme() as selected_button:
         # myStyleVar_FrameBorderSize
         # FrameBorder
 
-def cb():
-    global selected_pivot_index
-    swap_labels(selected_tag=selected_pivot_index)
+
 # ===========================
 
-with dpg.window(tag="window", width=700, height=400):
+
+def delete_pivot():
+    if dpg.does_item_exist(ID_PIVOT_TABLE):
+        grid_selector.deregister()
+        dpg.delete_item(ID_PIVOT_TABLE)
+        
+
+def make_pivot():
+    delete_pivot()
+    
+    global grid_selector
+    global df 
+    global column_map
+    global index_to_column_names
+
+    
+
+    rows = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_ROWSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
+    cols = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_COLSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
+    aggs = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_DATALIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
+    
+    df = pivotBroker.get_pivot(filter=None, 
+                                rows=rows, 
+                                cols=cols,
+                                aggs=aggs)
+    
+    grid_selector = GridSelector(ID_GRID_SELECT, width=df.shape[1], height=df.shape[0])
+    # print(df)
+    column_map = get_column_map(df)
+    # print(column_map)
+    index_to_column_names = get_index_map(column_map)
+
+    with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
+                   header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
+                   row_background=False, no_host_extendX=True, no_pad_innerX=False,
+                   borders_outerH=True, 
+                   borders_outerV=True,
+                   borders_innerV=True):
+        
+        # first level name
+        dpg.add_table_column(label=df.columns.names[0])
+        # dpg.add_table_column(label="")
+        # first level values
+        top_level = column_map.keys()
+        
+        for key0 in top_level:
+            dpg.add_table_column(label=key0)
+
+        # a single row that contains all data in the table
+        with dpg.table_row():
+            
+            # insert df.index into first column
+            column_names = df.columns.names[1:]
+            add_index_recursive(column_names, 0)
+
+            add_data_recursive(column_map, keys=[])
+
+# ===========================
+
+with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=400):
+    
+    dpg.add_button(label='Update table', callback=make_pivot)
     
     with dpg.collapsing_header(label="Setup"):
         with dpg.child_window(height=135) as w:
@@ -400,7 +456,7 @@ with dpg.window(tag="window", width=700, height=400):
                     with dpg.table_row():
                         dpg.add_text("Where: ")
                         with dpg.group(horizontal=False, drop_callback= on_pwhere_drop, payload_type="PROW") as g:
-                            create_pivot_filter(parent=g, field="Year", label="Year is in [2021, 2022]")
+                            create_pivot_filter(parent=g, field="Year", label="Year is in [2022, 2023]")
                             create_pivot_filter(parent=g, field="Weight", label="Weight > 0")
                             
                     with dpg.table_row():
@@ -435,40 +491,8 @@ with dpg.window(tag="window", width=700, height=400):
                         dpg.set_item_callback(pidx_left, lambda: swap_labels(selected_tag=selected_pivot_index, forward=False))
                         dpg.set_item_callback(pidx_right, lambda: swap_labels(selected_tag=selected_pivot_index, forward=True))
 
-    with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
-                   row_background=False, no_host_extendX=True, no_pad_innerX=False,
-                   borders_outerH=True, 
-                   borders_outerV=True,
-                   borders_innerV=True):
-        
-        # first level name
-        dpg.add_table_column(label=df.columns.names[0])
-        # dpg.add_table_column(label="")
-        # first level values
-        top_level = column_map.keys()
-        
-        for key0 in top_level:
-            dpg.add_table_column(label=key0)
+    make_pivot()
 
-        # a single row that contains all data in the table
-        with dpg.table_row():
-            
-            # insert df.index into first column
-            column_names = df.columns.names[1:]
-            add_index_recursive(column_names, 0)
-
-            add_data_recursive(column_map, keys=[])
-
-# i think we need some map from the cell to [parent_id, i, j]
-# also when we build the widget_grid, we need to map from 
-# we can get the local column index from len(nx_level.values())
-# and the row is just row_index
-# 
-# cell = grid_selector.widget_grid[8][1]
-# parent_table = dpg.get_item_parent(dpg.get_item_parent(cell))
-# print(dpg.highlight_table_cell(parent_table, 10, 1, [34, 83, 118, 100]))
-# print(dpg.get_item_info(cell))
-# print(list_of_pivot_filter_buttons)
 
 dpg.show_viewport()
 

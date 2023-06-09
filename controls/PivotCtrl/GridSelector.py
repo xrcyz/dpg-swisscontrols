@@ -123,5 +123,6 @@ class GridSelector:
         print(f"Address: {column}, {row}")
 
     def deregister(self):
-        dpg.delete_item(self.mouse_registry)
+        if (self.mouse_registry > 0 and dpg.does_item_exist(self.mouse_registry)):
+            dpg.delete_item(self.mouse_registry)
         self.mouse_registry = -1
