@@ -32,16 +32,16 @@ ID_PIVOT_TABLE = dpg.generate_uuid()
 
 pivotBroker = PivotBroker()
 df = pivotBroker.get_pivot(filter=None, 
-                           rows=['Year', 'Quarter'], # '(Data)', 
-                           cols=['Fruit', 'Shape', '(Data)'],
-                           aggs=['Volume', 'Weight'])
+                           rows=['Year', 'Shape'], # '(Data)', 
+                           cols=['(Data)', 'Fruit'],
+                           aggs=['Weight'])
 
 # print(df)
 # print(df.columns)
 # print(df.shape)
 # print(df.index)
 
-def get_column_map(df):
+def get_column_to_index_treedict(df):
     """
     Get a mapping from hierarchical column levels to DataFrame column indices.
 
@@ -57,26 +57,30 @@ def get_column_map(df):
     # Initialize an empty dictionary
     lookup = {}
 
-    # Iterate over the DataFrame's columns
-    for i, col in enumerate(df.columns):
+    if isinstance(df.columns, pd.MultiIndex):
+        # Iterate over the DataFrame's columns
+        for i, col in enumerate(df.columns):
 
-        # Extract the values at each level of the column
-        level_values = col[:len(df.columns.names)]
-        
-        # Traverse the lookup dictionary, creating new dictionaries as needed
-        current_dict = lookup
-        for value in level_values[:-1]:
-            if value not in current_dict:
-                current_dict[value] = {}
-            current_dict = current_dict[value]
+            # Extract the values at each level of the column
+            level_values = col[:len(df.columns.names)]
+            
+            # Traverse the lookup dictionary, creating new dictionaries as needed
+            current_dict = lookup
+            for value in level_values[:-1]:
+                if value not in current_dict:
+                    current_dict[value] = {}
+                current_dict = current_dict[value]
 
-        # Add the final level to the lookup dictionary
-        if level_values[-1] not in current_dict:
-            current_dict[level_values[-1]] = i
+            # Add the final level to the lookup dictionary
+            if level_values[-1] not in current_dict:
+                current_dict[level_values[-1]] = i
+
+    else:
+        lookup = { item: i for i, item in enumerate(df.columns)}
 
     return lookup
 
-def get_index_map(column_map, current_keys=[], index_map={}):
+def get_index_to_columnnames_dict(column_map, current_keys=[], index_map={}):
     """
     Recursively create an index map for a nested column structure.
     
@@ -94,11 +98,29 @@ def get_index_map(column_map, current_keys=[], index_map={}):
         
     for key, value in current_level.items():
         if isinstance(value, dict):
-            get_index_map(column_map, current_keys + [key], index_map)
+            get_index_to_columnnames_dict(column_map, current_keys + [key], index_map)
         else:
             index_map[value] = current_keys + [key]
 
     return index_map
+
+def compact_index(df):
+    """
+    Compacts a DataFrame MultiIndex by replacing consecutive identical values with ''.
+
+    Args:
+    df (pandas.DataFrame): The DataFrame with the MultiIndex to compact.
+
+    Returns:
+    list: A list of lists, each containing the compacted values from each level of the MultiIndex.
+    """
+
+    index_list = df.index.tolist()  # Convert the MultiIndex to a list of tuples
+
+    # Use a list comprehension to replace consecutive identical values with ''
+    compact_index = [[col if j == 0 or col != index_list[j - 1][i] else '' for i, col in enumerate(row)] for j, row in enumerate(index_list)]
+
+    return compact_index
 
 def add_index_recursive(column_names, depth):
     # called inside a row
@@ -140,8 +162,8 @@ def add_data_recursive(column_map, keys):
     # adding a table to each column in the row
     for key in current_level.keys():
         with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
-                   row_background=False, no_host_extendX=True, no_pad_innerX=False,
-                   borders_outerH=False, borders_innerV=True):
+                row_background=False, no_host_extendX=True, no_pad_innerX=False,
+                borders_outerH=False, borders_innerV=True):
             nx_level = current_level[key]
             for nx_key in nx_level:
                 dpg.add_table_column(label=nx_key)
@@ -149,7 +171,7 @@ def add_data_recursive(column_map, keys):
             if isinstance(next(iter(nx_level.values())), dict):
                 # if the values of nx_level are dicts, keep going 
                 with dpg.table_row():
-                    add_data_recursive(column_map, keys + [key])  
+                    add_data_recursive(column_map, keys + [key])              
             else:
                 # multi-index offset row 
                 # with dpg.table_row():
@@ -170,9 +192,9 @@ def add_data_recursive(column_map, keys):
 
 
 
-column_map = get_column_map(df)
+column_names_to_absolute_column_index = get_column_to_index_treedict(df)
 # print(column_map)
-index_to_column_names = get_index_map(column_map)
+absolute_column_index_to_column_names = get_index_to_columnnames_dict(column_names_to_absolute_column_index)
 # print(index_to_column_names)  
 # grid_selector = GridSelector(ID_GRID_SELECT, width=df.shape[1], height=df.shape[0])
 
@@ -383,8 +405,8 @@ def update_pivot():
     
     global grid_selector
     global df 
-    global column_map
-    global index_to_column_names
+    global column_names_to_absolute_column_index
+    global absolute_column_index_to_column_names
 
     rows = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_ROWSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
     cols = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_COLSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
@@ -397,10 +419,13 @@ def update_pivot():
     
     grid_selector = GridSelector(ID_GRID_SELECT, width=df.shape[1], height=df.shape[0])
     # print(df)
-    column_map = get_column_map(df)
+    column_names_to_absolute_column_index = get_column_to_index_treedict(df)
     # print(column_map)
-    index_to_column_names = get_index_map(column_map)
-
+    absolute_column_index_to_column_names = get_index_to_columnnames_dict(column_names_to_absolute_column_index)
+    # print(absolute_column_index_to_column_names)
+    pretty_df_index = compact_index(df)
+    # print(pretty_df_index)
+    
     with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
                    header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
                    row_background=False, no_host_extendX=True, no_pad_innerX=False,
@@ -408,29 +433,52 @@ def update_pivot():
                    borders_outerV=True,
                    borders_innerV=True):
         
-        # first level name
-        dpg.add_table_column(label=df.columns.names[0])
-        # dpg.add_table_column(label="")
-        # first level values
-        top_level = column_map.keys()
-        
-        for key0 in top_level:
-            dpg.add_table_column(label=key0)
-
-        # a single row that contains all data in the table
-        with dpg.table_row():
+        if not isinstance(df.columns, pd.MultiIndex):
             
-            # insert df.index into first column
-            column_names = df.columns.names[1:]
-            add_index_recursive(column_names, 0)
+            for name in df.index.names:
+                dpg.add_table_column(label=name)
+            for key in column_names_to_absolute_column_index.keys():
+                dpg.add_table_column(label=key)
+            for row_index in range(df.shape[0]):
+                with dpg.table_row():
+                    for name in pretty_df_index[row_index]:
+                        dpg.add_text(name)
+                    for relative_column_index, absolute_column_index in enumerate(column_names_to_absolute_column_index.values()):
+                        val = df.iloc[row_index, absolute_column_index]
+                        cell = dpg.add_selectable(label="{:.2f}".format(val))
+                        grid_selector.widget_grid[row_index][absolute_column_index] = cell
+                        grid_selector.dpg_lookup[row_index][absolute_column_index] = [
+                            dpg.get_item_parent(dpg.get_item_parent(cell)), 
+                            row_index , # offset for multi-index row
+                            relative_column_index # + len(df.index[0])
+                        ]
+        else:
+            # first level name
+            dpg.add_table_column(label=df.columns.names[0])
+            # dpg.add_table_column(label="")
+            # first level values
+            top_level = column_names_to_absolute_column_index.keys()
+            
+            for key0 in top_level:
+                dpg.add_table_column(label=key0)
 
-            add_data_recursive(column_map, keys=[])
+            # a single row that contains all data in the table
+            with dpg.table_row():
+                
+                # insert df.index into first column
+                column_names = df.columns.names[1:]
+                add_index_recursive(column_names, 0)
+
+                # if isinstance(df.columns, pd.MultiIndex):
+                add_data_recursive(column_names_to_absolute_column_index, keys=[])
+                # else:
+                #     print(column_map)
 
 # ===========================
 
 with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=400):
     
-    dpg.add_button(label='Update table', callback=update_pivot)
+    # dpg.add_button(label='Update table', callback=update_pivot)
     
     with dpg.collapsing_header(label="Setup"):
         with dpg.child_window(height=135) as w:
@@ -481,17 +529,16 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=400):
                                 dpg.add_text("Rows: ", indent=10)
                                 
                                 create_pivot_idx(parent=ID_ROWSLIST, label="Year")
-                                create_pivot_idx(parent=ID_ROWSLIST, label="Quarter")
+                                create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
                                 
                             with dpg.group(tag=ID_COLSLIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW"):
                                 dpg.add_text("Columns: ", indent=10)
-                                create_pivot_idx(parent=ID_COLSLIST, label="Fruit")
-                                create_pivot_idx(parent=ID_COLSLIST, label="Shape")
                                 create_pivot_idx(parent=ID_COLSLIST, label="(Data)")
+                                create_pivot_idx(parent=ID_COLSLIST, label="Fruit")
+                                
 
                             with dpg.group(tag=ID_DATALIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
                                 dpg.add_text("Data: ", indent=10)
-                                create_pivot_idx(parent=ID_DATALIST, label="Volume")
                                 create_pivot_idx(parent=ID_DATALIST, label="Weight")
                                 
 

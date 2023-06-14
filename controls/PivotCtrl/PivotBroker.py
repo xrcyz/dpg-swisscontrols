@@ -34,6 +34,7 @@ class PivotBroker:
         A special string '(Data)' indicates the level of the `aggs` fields in one of the MultiIndexes.
         """
 
+        # before anything else, figure out the transpose situation
         transpose = False
         if('(Data)' in rows):
             """
@@ -41,7 +42,7 @@ class PivotBroker:
             """
             cols, rows = rows, cols
             transpose = True
-            
+
         cols_init = ['(Data)'] + [col for col in cols if col != '(Data)'] # initial dataframe.columns.names
         col_levels_dict = {col: cols_init.index(col) for col in cols_init} # index of each item in initial df
         col_level_order = [col_levels_dict[item] for item in cols] # where we want the cols to be
@@ -50,22 +51,27 @@ class PivotBroker:
         cols.remove('(Data)') 
         
         # give thanks to pandas
-        group_by = (self.df.copy()[rows+cols+aggs]
+        result = (self.df.copy()[rows+cols+aggs]
                     .groupby(rows+cols)
                     .sum(numeric_only=True)
-                    .unstack(cols)    
-                    .reorder_levels(order=col_level_order, axis=1)
+                    .unstack(cols)
                     .fillna(0)
                 )
         
+        # reorder cols if not empty list
+        if cols: 
+            result = result.reorder_levels(order=col_level_order, axis=1)
+
         # create a rename dict for custom field ordering
         agg_order = {str: f'"@$%"+{idx}' for idx, str in enumerate(aggs)} 
-        group_by.rename(columns=agg_order, inplace=True)
-        group_by = group_by.sort_index(axis=1)
-        group_by.rename(columns={v: k for k, v in agg_order.items()}, inplace=True)
+        result.rename(columns=agg_order, inplace=True)
+        result = result.sort_index(axis=1)
+        result.rename(columns={v: k for k, v in agg_order.items()}, inplace=True)
 
         if(transpose):
-            group_by = group_by.T
+            result = result.T
         
-        return group_by
+        # print(result)
+        # print(result.index)
+        return result
     
