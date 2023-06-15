@@ -60,6 +60,11 @@ class PivotBroker:
         
         # reorder cols if not empty list
         if cols: 
+            # name the '(Data)' level
+            new_names = list(result.columns.names)
+            new_names[0] = "(Data)"
+            result.columns.set_names(new_names, inplace=True)
+            # order the columns
             result = result.reorder_levels(order=col_level_order, axis=1)
 
         # create a rename dict for custom field ordering

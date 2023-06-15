@@ -152,3 +152,4 @@ cython_debug/
 #.idea/
 PivotCtrl/test.ipynb
 PivotCtrl/test.py
+controls/PivotCtrl/test.ipynb
