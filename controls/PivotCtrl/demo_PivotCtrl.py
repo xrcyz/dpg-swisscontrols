@@ -173,10 +173,6 @@ def add_data_recursive(column_map, keys):
                 with dpg.table_row():
                     add_data_recursive(column_map, keys + [key])              
             else:
-                # multi-index offset row 
-                # with dpg.table_row():
-                #     for i in range(8):
-                #         dpg.add_text("")
                 # if the values of nx_level are strings, write table 
                 for row_index in range(df.shape[0]):
                     with dpg.table_row():
@@ -420,39 +416,46 @@ def update_pivot():
     grid_selector = GridSelector(ID_GRID_SELECT, width=df.shape[1], height=df.shape[0])
     # print(df)
     column_names_to_absolute_column_index = get_column_to_index_treedict(df)
-    # print(column_map)
+    # print(column_names_to_absolute_column_index)
     absolute_column_index_to_column_names = get_index_to_columnnames_dict(column_names_to_absolute_column_index)
     # print(absolute_column_index_to_column_names)
     pretty_df_index = compact_index(df)
     # print(pretty_df_index)
     
-    with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
-                   header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
-                   row_background=False, no_host_extendX=True, no_pad_innerX=False,
-                   borders_outerH=True, 
-                   borders_outerV=True,
-                   borders_innerV=True):
+    
         
-        if not isinstance(df.columns, pd.MultiIndex):
-            
+    if not isinstance(df.columns, pd.MultiIndex):
+        with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
+                header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
+                row_background=False, no_host_extendX=True, no_pad_innerX=False,
+                borders_outerH=True, 
+                borders_outerV=True,
+                borders_innerV=True):
+            # case where columns are not multi-index
             for name in df.index.names:
                 dpg.add_table_column(label=name)
             for key in column_names_to_absolute_column_index.keys():
                 dpg.add_table_column(label=key)
             for row_index in range(df.shape[0]):
-                with dpg.table_row():
+                with dpg.table_row() as trow:
                     for name in pretty_df_index[row_index]:
-                        dpg.add_text(name)
+                        dpg.add_selectable(label=name)
                     for relative_column_index, absolute_column_index in enumerate(column_names_to_absolute_column_index.values()):
                         val = df.iloc[row_index, absolute_column_index]
-                        cell = dpg.add_selectable(label="{:.2f}".format(val))
+                        cell = dpg.add_selectable(label="{:.2f}".format(val)) #, height=dpg.get_item_height(trow))
                         grid_selector.widget_grid[row_index][absolute_column_index] = cell
                         grid_selector.dpg_lookup[row_index][absolute_column_index] = [
                             dpg.get_item_parent(dpg.get_item_parent(cell)), 
                             row_index , # offset for multi-index row
-                            relative_column_index # + len(df.index[0])
+                            relative_column_index + len(df.index.names) # + len(df.index[0])
                         ]
-        else:
+    else:
+        with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
+                   header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
+                   row_background=False, no_host_extendX=True, no_pad_innerX=False,
+                   borders_outerH=True, 
+                   borders_outerV=True,
+                   borders_innerV=True):
             # first level name
             dpg.add_table_column(label=df.columns.names[0])
             # dpg.add_table_column(label="")
@@ -476,7 +479,7 @@ def update_pivot():
 
 # ===========================
 
-with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=400):
+with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
     
     # dpg.add_button(label='Update table', callback=update_pivot)
     

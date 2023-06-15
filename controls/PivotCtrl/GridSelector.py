@@ -2,7 +2,7 @@ import dearpygui.dearpygui as dpg
 import numpy as np
 import itertools
 
-def if_between(a, b, c):
+def is_between(a, b, c):
     """Checks if b is between a and c (inclusive). Handles any order of a, b, c."""
     return min(a, c) <= b <= max(a, c)
 
@@ -84,17 +84,21 @@ class GridSelector:
             self.mouse_drag_coords[0] = mouse_pos
             self.is_dragging_range = True
             widget_widths = [dpg.get_item_rect_size(w)[0]+1 for w in self.widget_grid[0]]
-            widget_heights = [dpg.get_item_rect_size(r[0])[1] for r in self.widget_grid]
+            widget_heights = [dpg.get_item_rect_size(r[0])[1] for r in self.widget_grid] # y element of (first item in each row)
             column = int(np.searchsorted(np.cumsum(widget_widths), mouse_pos[0] - rect_min[0]))
             row = int(np.searchsorted(np.cumsum(widget_heights), mouse_pos[1] - rect_min[1]))
             self.range_coords[0] = [column, row]
-            print(f"Address: {column}, {row}")
+            
+            print(f"Mouse down: {column}, {row}")
 
     def on_mouse_drag(self, sender, app_data):
         # Get the ending position of the drag
         rect_min = dpg.get_item_rect_min(self.widget_grid[0][0])
         rect_max = dpg.get_item_rect_max(self.widget_grid[-1][-1])
         mouse_pos = dpg.get_mouse_pos(local=False)
+        # print(f"self.is_dragging_range: {self.is_dragging_range}")
+
+
         if(self.is_dragging_range and (rect_min[0] < mouse_pos[0] < rect_max[0]) and (rect_min[1] < mouse_pos[1] < rect_max[1])):
             self.mouse_drag_coords[1] = mouse_pos
             widget_widths = [dpg.get_item_rect_size(w)[0]+1 for w in self.widget_grid[0]]
@@ -106,7 +110,7 @@ class GridSelector:
             for j,i in itertools.product(range(self.height), range(self.width)):
                 
                 table_id, table_j, table_i = self.dpg_lookup[j][i]
-                if if_between(self.range_coords[0][0], i, self.range_coords[1][0]) and if_between(self.range_coords[0][1], j, self.range_coords[1][1]):
+                if is_between(self.range_coords[0][0], i, self.range_coords[1][0]) and is_between(self.range_coords[0][1], j, self.range_coords[1][1]):
                     dpg.highlight_table_cell(table_id, table_j, table_i, [34, 83, 118, 100])
                 else:
                     dpg.unhighlight_table_cell(table_id, table_j, table_i)
@@ -118,9 +122,10 @@ class GridSelector:
                     
 
     def on_mouse_up(self, sender, app_data):
-        self.is_dragging_range = False
+        
         row, column = self.on_mouse_drag(sender, app_data)
-        print(f"Address: {column}, {row}")
+        self.is_dragging_range = False
+        print(f"Mouse up: {column}, {row}")
 
     def deregister(self):
         if (self.mouse_registry > 0 and dpg.does_item_exist(self.mouse_registry)):
