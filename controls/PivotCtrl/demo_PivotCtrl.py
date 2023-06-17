@@ -9,6 +9,17 @@ from GridSelector import GridSelector
 from PivotBroker import PivotBroker
 from ListSelectCtrl import listSelectCtrl
 
+"""
+TODO
+- deal with empty rows (DONE), cols (DONE), data
+- fix `compact_index` if there's only one data field and (Data) is in cols
+- fix swap buttons 
+- (Data) can only drag-drop to [rows,cols]
+- limit [category, values] drag-drop destinations
+- make filters work
+- make weight averages work
+"""
+
 from enum import Enum
 
 class MvItemTypes(Enum):
@@ -296,7 +307,7 @@ def select_fields_callback(user_sel):
             dpg.delete_item(btn)
             list_of_pivot_index_buttons.remove(btn)
 
-
+    update_pivot()
     # print(user_sel)
 
 # ===========================
@@ -474,6 +485,7 @@ def update_pivot():
                             relative_column_index + len(df.index.names) 
                         ]
     else:
+        # case where columns are multi-index
         with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
                    header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
                    row_background=False, no_host_extendX=True, no_pad_innerX=False,

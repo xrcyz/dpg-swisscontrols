@@ -50,19 +50,40 @@ class PivotBroker:
         # Remove '(Data)' from cols list
         cols.remove('(Data)') 
         
-        # give thanks to pandas
-        result = (self.df.copy()[rows+cols+aggs]
-                    .groupby(rows+cols)
-                    .sum(numeric_only=True)
-                    .unstack(cols)
-                    .fillna(0)
-                )
+         # deal with special cases
+        if not (rows+cols+aggs):
+            # special case: [rows, cols, aggs] are all empty
+            return pd.DataFrame(index=[""], columns=[""]).fillna("")
+        elif not (rows+cols):
+            # if rows and cols are empty, sum the aggs
+            result = (self.df.copy()[aggs]
+                      .sum(numeric_only=True)
+                      .to_frame().T # convert series back to dataframe
+                    )
+            
+            # set column name to Value
+            result = result.rename(index={0: 'Value'})
+
+        else:
+            # give thanks to pandas
+            result = (self.df.copy()[rows+cols+aggs]
+                        .groupby(rows+cols)
+                        .sum(numeric_only=True)
+                        # .unstack(cols)
+                        # .fillna(0)
+                    )
         
+            # if rows is empty list, insert a 'Value' level 
+            if not rows:  
+                result = pd.concat([result], axis=0, keys=['Value'])
+        
+        result = result.unstack(cols).fillna(0)
+
         # reorder cols if not empty list
         if cols: 
             # name the '(Data)' level
             new_names = list(result.columns.names)
-            new_names[0] = "(Data)"
+            new_names[0] = "Field"
             result.columns.set_names(new_names, inplace=True)
             # order the columns
             result = result.reorder_levels(order=col_level_order, axis=1)
@@ -76,7 +97,5 @@ class PivotBroker:
         if(transpose):
             result = result.T
         
-        # print(result)
-        # print(result.index)
         return result
     
