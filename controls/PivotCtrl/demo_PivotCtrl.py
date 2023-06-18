@@ -11,11 +11,10 @@ from ListSelectCtrl import listSelectCtrl
 
 """
 TODO
-- deal with empty rows (DONE), cols (DONE), data
 - fix `compact_index` if there's only one data field and (Data) is in cols
 - fix swap buttons 
 - (Data) can only drag-drop to [rows,cols]
-- limit [category, values] drag-drop destinations
+- [category, values] can only drag-drop to destinations
 - make filters work
 - make weight averages work
 """
@@ -438,7 +437,7 @@ def update_pivot():
     global grid_selector
     global df 
     global column_names_to_absolute_column_index
-    global absolute_column_index_to_column_names
+    # global absolute_column_index_to_column_names
 
     rows = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_ROWSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
     cols = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_COLSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
@@ -453,7 +452,7 @@ def update_pivot():
     # print(df)
     column_names_to_absolute_column_index = get_column_to_index_treedict(df)
     # print(column_names_to_absolute_column_index)
-    absolute_column_index_to_column_names = get_index_to_columnnames_dict(column_names_to_absolute_column_index)
+    # absolute_column_index_to_column_names = get_index_to_columnnames_dict(column_names_to_absolute_column_index)
     # print(absolute_column_index_to_column_names)
     pretty_df_index = compact_index(df)
     # print(pretty_df_index)
@@ -477,6 +476,11 @@ def update_pivot():
                         dpg.add_selectable(label=name)
                     for relative_column_index, absolute_column_index in enumerate(column_names_to_absolute_column_index.values()):
                         val = df.iloc[row_index, absolute_column_index]
+                        
+                        # pivot tables shall display numbers only
+                        if not isinstance(val, (int, float, np.number)):
+                            raise ValueError(f"Expected a numeric value, but got {val} of type {type(val)}")
+                        
                         cell = dpg.add_selectable(label="{:.2f}".format(val)) 
                         grid_selector.widget_grid[row_index][absolute_column_index] = cell
                         grid_selector.dpg_lookup[row_index][absolute_column_index] = [
@@ -567,19 +571,19 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                             with dpg.group(tag=ID_ROWSLIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW"):
                                 dpg.add_text("Rows: ", indent=10)
                                 
-                                create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
+                                # create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
                                 create_pivot_idx(parent=ID_ROWSLIST, label="(Data)")
-                                create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
+                                # create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
                                 
                             with dpg.group(tag=ID_COLSLIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW"):
                                 dpg.add_text("Columns: ", indent=10)
                                 
-                                create_pivot_idx(parent=ID_COLSLIST, label="Year")
+                                # create_pivot_idx(parent=ID_COLSLIST, label="Year")
                                 
 
                             with dpg.group(tag=ID_DATALIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
                                 dpg.add_text("Data: ", indent=10)
-                                create_pivot_idx(parent=ID_DATALIST, label="Weight")
+                                # create_pivot_idx(parent=ID_DATALIST, label="Weight")
                                 
 
                         dpg.set_item_callback(pidx_left, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=False))

@@ -74,9 +74,16 @@ class GridSelector:
     def __del__(self):
         self.deregister()
 
+    def is_empty(self):
+        return (len(self.widget_grid) == 0 or len(self.widget_grid[0]) == 0)
+
     def on_mouse_down(self, sender, app_data):
+        
+        # bail if widget grid is empty
+        if self.is_empty():
+            return
+
         # test if mouse inside table bounding box
-    
         rect_min = dpg.get_item_rect_min(self.widget_grid[0][0])
         rect_max = dpg.get_item_rect_max(self.widget_grid[-1][-1])
         mouse_pos = dpg.get_mouse_pos(local=False)
@@ -92,6 +99,10 @@ class GridSelector:
             print(f"Mouse down: {column}, {row}")
 
     def on_mouse_drag(self, sender, app_data):
+        # bail if widget grid is empty
+        if self.is_empty():
+            return None, None
+        
         # Get the ending position of the drag
         rect_min = dpg.get_item_rect_min(self.widget_grid[0][0])
         rect_max = dpg.get_item_rect_max(self.widget_grid[-1][-1])

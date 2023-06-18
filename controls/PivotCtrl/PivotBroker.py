@@ -15,9 +15,13 @@ class PivotBroker:
         # should be flat data
         self.df = get_flat_data()
 
+        assert not isinstance(self.df.columns, pd.MultiIndex), "DataFrame columns should not be a MultiIndex"
+        assert not isinstance(self.df.index, pd.MultiIndex), "DataFrame index should not be a MultiIndex"
+        assert isinstance(self.df.index, pd.RangeIndex), "DataFrame index should be a default integer-based index (RangeIndex)"
+
     def get_field_list(self):
         # return sorted(self.df.columns)
-        # assume the data source, in its infinite wisdom, has given us a column order
+        # assume the data source, in its infinite wisdom, has given us pre-ordered columns
         return self.df.columns
     
     def get_pivot(self, 
@@ -53,7 +57,9 @@ class PivotBroker:
          # deal with special cases
         if not (rows+cols+aggs):
             # special case: [rows, cols, aggs] are all empty
-            return pd.DataFrame(index=[""], columns=[""]).fillna("")
+            result = pd.DataFrame(index=[""], columns=[""]).fillna(0 )
+
+            return result    
         elif not (rows+cols):
             # if rows and cols are empty, sum the aggs
             result = (self.df.copy()[aggs]
@@ -69,14 +75,13 @@ class PivotBroker:
             result = (self.df.copy()[rows+cols+aggs]
                         .groupby(rows+cols)
                         .sum(numeric_only=True)
-                        # .unstack(cols)
-                        # .fillna(0)
                     )
         
             # if rows is empty list, insert a 'Value' level 
             if not rows:  
                 result = pd.concat([result], axis=0, keys=['Value'])
         
+        # unstack columns
         result = result.unstack(cols).fillna(0)
 
         # reorder cols if not empty list
@@ -96,6 +101,7 @@ class PivotBroker:
 
         if(transpose):
             result = result.T
+        
         
         return result
     
