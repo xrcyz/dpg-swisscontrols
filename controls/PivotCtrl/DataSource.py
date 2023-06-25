@@ -1,6 +1,22 @@
+import random
+
 import pandas as pd
 import numpy as np
-import random
+
+from PivotFields import PivotFieldTypes
+
+def get_field_data():
+    return {
+        'Year': PivotFieldTypes.GroupBy.GROUPBY,
+        'Quarter': PivotFieldTypes.GroupBy.GROUPBY,
+        'Fruit': PivotFieldTypes.GroupBy.GROUPBY,
+        'Shape': PivotFieldTypes.GroupBy.GROUPBY,
+        'Vibe': PivotFieldTypes.GroupBy.GROUPBY,
+        'Weight': PivotFieldTypes.Aggregate.SUM,
+        'Volume': PivotFieldTypes.Aggregate.SUM,
+        'Price/kg': PivotFieldTypes.Aggregate.WEIGHTED_AVERAGE,
+    }
+    
 
 def get_flat_data():
     # Number of rows to generate

@@ -1,25 +1,28 @@
 
+import itertools
+from enum import Enum
+import dataclasses
+
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
-import itertools
-import dataclasses
-from DataSource import get_pivot_data
+
 from GridSelector import GridSelector
 from PivotBroker import PivotBroker
+from PivotFields import PivotFieldTypes 
 from ListSelectCtrl import listSelectCtrl
 
 """
-TODO
-- fix `compact_index` if there's only one data field and (Data) is in cols
+DONE
+- deal with empty rows, cols, aggs
 - fix swap buttons 
-- (Data) can only drag-drop to [rows,cols]
-- [category, values] can only drag-drop to destinations
-- make filters work
+- create [categories, values] field types in pivot broker
+- [category, values, (Data)] can only drag-drop to right destinations
+TODO
 - make weight averages work
+- make filters work
+- fix `compact_index` if there's only one data field and (Data) is in cols
 """
-
-from enum import Enum
 
 class MvItemTypes(Enum):
     Button = 'mvAppItemType::mvButton'
@@ -232,7 +235,7 @@ absolute_column_index_to_column_names = get_index_to_columnnames_dict(column_nam
 
 # ===========================
 
-def swap_labels(selected_tag, forward=True):
+def swap_button_labels(selected_tag, forward=True):
     parent_group = dpg.get_item_parent(selected_pivot_index)
     children = dpg.get_item_children(parent_group, 1)
     
@@ -249,6 +252,8 @@ def swap_labels(selected_tag, forward=True):
         
 
         next_tag = children[idx + (1 if forward else -1)]
+        if (dpg.get_item_type(next_tag) != MvItemTypes.Button.value):
+            return
 
         # Get the labels of the selected item and the next item
         selected_label = dpg.get_item_label(selected_tag)
@@ -258,7 +263,7 @@ def swap_labels(selected_tag, forward=True):
         dpg.set_item_label(selected_tag, label=next_label)
         dpg.set_item_label(next_tag, label=selected_label)
 
-        on_pidx_button_press(next_tag, None, None)
+        pidx_highlight_button(next_tag, None, None)
 
 
 # ===========================
@@ -323,12 +328,19 @@ list_of_pivot_index_buttons = []
 list_of_pivot_filter_buttons = []
 
 def on_pidx_swap(selected_tag, forward=True):
-    swap_labels(selected_tag, forward)
+    swap_button_labels(selected_tag, forward)
     update_pivot()
 
 def on_psel_drop(drop_sender, drag_sender):
+    """
+    Handles drag-drop onto the Fields listbox.
+    Simply delete the caller, update the button list, and done. 
+    """
     print(f"Dropped {drag_sender} onto {drop_sender}")
 
+    # special case for `(Data)` pidx_button
+    if dpg.get_item_label(drag_sender) == '(Data)':
+        return
     # logic for dragging from rows and columns back to selected fields
     if drag_sender in list_of_pivot_index_buttons:
         dpg.delete_item(drag_sender)
@@ -341,35 +353,57 @@ def on_pwhere_drop(drop_sender, drag_sender):
     print(f"Dropped {drag_sender} onto {drop_sender}")
 
 def on_pidx_drop(drop_sender, drag_sender):
+    """
+    Handles drag-drop onto [Rows, Cols, Values] lanes.
+    - Check if the drag field type matches the accepted payload type (GroupBy or Aggregate)
+    - Delete the caller if caller was a pidx_button
+    - Create a new pidx_button at the drop site
+    """
     print(f"Dropped {drag_sender} onto {drop_sender}")
+    field_name = dpg.get_item_label(drag_sender)
+    drag_field_instance = pivotBroker.get_field_type(field_name)
+    drop_field_type = dpg.get_item_user_data(drop_sender)
+    
+    if (not isinstance(drag_field_instance, drop_field_type)): # or (field_name == "(Data)" and drop_field_type != PivotFieldTypes.GroupBy):
+        # delete the previous popup
+        if(dpg.does_item_exist("popup_reject_drop")):
+            dpg.delete_item("popup_reject_drop")
+        
+        drag_type_str = "GroupBy" if isinstance(drag_field_instance, PivotFieldTypes.GroupBy) else "Data"
+        drop_type_str = "GroupBy" if (drop_field_type == PivotFieldTypes.GroupBy) else "Data"
+
+        with dpg.window(popup=True, tag="popup_reject_drop", height=24) as popup:
+            dpg.add_text(f"Can't drop a '{drag_type_str}' field into a '{drop_type_str}' lane.")
+
+        return
+
     global list_of_pivot_index_buttons
 
     current_buttons = list_of_pivot_index_buttons
 
     # logic for dragging between rows and columns
     if drag_sender in list_of_pivot_index_buttons:
-        create_pivot_idx(parent=drop_sender, label=dpg.get_item_label(drag_sender))
+        create_pivot_idx(parent=drop_sender, label=field_name)
         dpg.delete_item(drag_sender)
         list_of_pivot_index_buttons.remove(drag_sender)
+
     # logic for dragging from field list to rows and columns
     elif drag_sender in list_of_pivot_field_selectables:
         # only add field to rows and cols if not already present
-        field = dpg.get_item_label(drag_sender)
-
-        list_of_pivot_index_buttons =  [item for item in list_of_pivot_index_buttons if dpg.get_item_label(item) != field]
+        list_of_pivot_index_buttons =  [item for item in list_of_pivot_index_buttons if dpg.get_item_label(item) != field_name]
 
         deletions = [item for item in current_buttons if item not in list_of_pivot_index_buttons]
         for e in deletions:
             dpg.delete_item(e)
             
-        create_pivot_idx(parent=drop_sender, label=dpg.get_item_label(drag_sender))
+        create_pivot_idx(parent=drop_sender, label=field_name)
 
     update_pivot()
 
 def on_pidx_drag(sender):
-    on_pidx_button_press(sender, None, None)
+    pidx_highlight_button(sender, None, None)
 
-def on_pidx_button_press(sender, app_data, user_data): 
+def pidx_highlight_button(sender, app_data, user_data): 
     global selected_pivot_index
     # highlight the button and unhighlight the rest
     for button in list_of_pivot_index_buttons:
@@ -381,7 +415,7 @@ def on_pidx_button_press(sender, app_data, user_data):
 
 def create_pivot_idx(parent, label):
     drag_tag = dpg.generate_uuid()
-    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW", drag_callback=on_pidx_drag, callback=on_pidx_button_press) # , width=8*len(label)
+    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW", drag_callback=on_pidx_drag, callback=pidx_highlight_button) # , width=8*len(label)
     list_of_pivot_index_buttons.append(b)
     with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
         dpg.add_text(label)
@@ -556,7 +590,10 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
 
                     with dpg.table_row():
                         dpg.add_text("Where: ")
-                        with dpg.group(horizontal=False, drop_callback= on_pwhere_drop, payload_type="PROW") as g:
+                        with dpg.group(horizontal=False, 
+                                       drop_callback= on_pwhere_drop, 
+                                       user_data=PivotFieldTypes.GroupBy,
+                                       payload_type="PROW") as g:
                             create_pivot_filter(parent=g, field="Year", label="Year is in [2022, 2023]")
                             create_pivot_filter(parent=g, field="Weight", label="Weight > 0")
                             
@@ -568,22 +605,31 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                                 pidx_right = dpg.add_button(arrow=True, direction=dpg.mvDir_Right)
 
                         with dpg.group(horizontal=False):
-                            with dpg.group(tag=ID_ROWSLIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW"):
+                            with dpg.group(tag=ID_ROWSLIST, horizontal=True, 
+                                           drop_callback= on_pidx_drop, 
+                                           user_data=PivotFieldTypes.GroupBy,
+                                           payload_type="PROW"):
                                 dpg.add_text("Rows: ", indent=10)
                                 
                                 # create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
                                 create_pivot_idx(parent=ID_ROWSLIST, label="(Data)")
                                 # create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
                                 
-                            with dpg.group(tag=ID_COLSLIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW"):
+                            with dpg.group(tag=ID_COLSLIST, horizontal=True, 
+                                           drop_callback= on_pidx_drop, 
+                                           user_data=PivotFieldTypes.GroupBy,
+                                           payload_type="PROW"):
                                 dpg.add_text("Columns: ", indent=10)
                                 
                                 # create_pivot_idx(parent=ID_COLSLIST, label="Year")
                                 
 
-                            with dpg.group(tag=ID_DATALIST, horizontal=True, drop_callback= on_pidx_drop, payload_type="PROW") as g:
+                            with dpg.group(tag=ID_DATALIST, horizontal=True, 
+                                           drop_callback= on_pidx_drop, 
+                                           user_data=PivotFieldTypes.Aggregate,
+                                           payload_type="PROW") as g:
                                 dpg.add_text("Data: ", indent=10)
-                                # create_pivot_idx(parent=ID_DATALIST, label="Weight")
+                                create_pivot_idx(parent=ID_DATALIST, label="Volume")
                                 
 
                         dpg.set_item_callback(pidx_left, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=False))

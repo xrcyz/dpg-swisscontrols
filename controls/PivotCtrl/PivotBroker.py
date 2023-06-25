@@ -1,4 +1,9 @@
-from DataSource import get_flat_data
+
+import dataclasses
+from enum import Enum
+
+from DataSource import get_flat_data, get_field_data
+from PivotFields import PivotFieldTypes
 import pandas as pd
 import numpy as np
 
@@ -14,6 +19,7 @@ class PivotBroker:
         # if df is multiindex raise exception
         # should be flat data
         self.df = get_flat_data()
+        self.field_data = get_field_data()
 
         assert not isinstance(self.df.columns, pd.MultiIndex), "DataFrame columns should not be a MultiIndex"
         assert not isinstance(self.df.index, pd.MultiIndex), "DataFrame index should not be a MultiIndex"
@@ -24,6 +30,14 @@ class PivotBroker:
         # assume the data source, in its infinite wisdom, has given us pre-ordered columns
         return self.df.columns
     
+    def get_field_type(self, field_name):
+        if (field_name == "(Data)"):
+            return PivotFieldTypes.GroupBy.GROUPBY
+        
+        if field_name not in self.field_data:
+            raise Exception(f"The field '{field_name}' does not exist.")
+        return self.field_data[field_name]
+
     def get_pivot(self, 
                   filter: list[str], 
                   rows: list[str], 
