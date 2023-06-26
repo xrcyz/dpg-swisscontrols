@@ -1,9 +1,10 @@
 
 import dataclasses
 from enum import Enum
+from typing import Dict
 
 from DataSource import get_flat_data, get_field_data
-from PivotFields import PivotFieldTypes
+from PivotFields import PivotField, PivotFieldTypes
 import pandas as pd
 import numpy as np
 
@@ -14,16 +15,31 @@ class PivotBroker:
     # handles all pandas operations separately from UI 
     # tells the UI the available fields names and types
 
+    df: pd.DataFrame
+    field_data: Dict[str, PivotField]
+
     def __init__(self):
 
         # if df is multiindex raise exception
         # should be flat data
         self.df = get_flat_data()
-        self.field_data = get_field_data()
-
         assert not isinstance(self.df.columns, pd.MultiIndex), "DataFrame columns should not be a MultiIndex"
         assert not isinstance(self.df.index, pd.MultiIndex), "DataFrame index should not be a MultiIndex"
         assert isinstance(self.df.index, pd.RangeIndex), "DataFrame index should be a default integer-based index (RangeIndex)"
+
+        self.field_data = get_field_data()
+
+        # assign the aggregation functions to local PivotBroker functions
+        self.aggregation_functions = {
+            PivotFieldTypes.Aggregate.SUM: 'sum',
+            PivotFieldTypes.Aggregate.WEIGHTED_AVERAGE: self.custom_weighted_average,
+            PivotFieldTypes.Aggregate.COUNT: 'count',
+            # define other aggregation functions here...
+        }
+
+        for name, field in self.field_data.items():
+            if isinstance(field.field_type, PivotFieldTypes.Aggregate):
+                field.agg_func = self.aggregation_functions[field.field_type]
 
     def get_field_list(self):
         # return sorted(self.df.columns)
@@ -36,7 +52,11 @@ class PivotBroker:
         
         if field_name not in self.field_data:
             raise Exception(f"The field '{field_name}' does not exist.")
-        return self.field_data[field_name]
+        return self.field_data[field_name].field_type
+
+    def custom_weighted_average(self, series: pd.Series) -> float:
+        weight_col = self.field_data[series.name].weight_field
+        return np.average(series, weights=self.df.loc[series.index, weight_col])
 
     def get_pivot(self, 
                   filter: list[str], 
@@ -51,6 +71,10 @@ class PivotBroker:
 
         A special string '(Data)' indicates the level of the `aggs` fields in one of the MultiIndexes.
         """
+        
+        agg_dict = {field: self.field_data[field].agg_func for field in aggs}
+        # if 'Price/kg' in agg_dict:
+        #     agg_dict['Price/kg'] = self.custom_weighted_average
 
         # before anything else, figure out the transpose situation
         transpose = False
@@ -74,21 +98,34 @@ class PivotBroker:
             result = pd.DataFrame(index=[""], columns=[""]).fillna(0 )
 
             return result    
-        elif not (rows+cols):
-            # if rows and cols are empty, sum the aggs
-            result = (self.df.copy()[aggs]
-                      .sum(numeric_only=True)
-                      .to_frame().T # convert series back to dataframe
-                    )
-            
-            # set column name to Value
-            result = result.rename(index={0: 'Value'})
-
-        else:
-            # give thanks to pandas
+        elif not (aggs):
+            # special case: [rows, cols] populated but [aggs] empty
             result = (self.df.copy()[rows+cols+aggs]
                         .groupby(rows+cols)
                         .sum(numeric_only=True)
+                        # .agg(agg_dict)
+                    )
+            
+            # if rows is empty list, insert a 'Value' level 
+            if not rows:  
+                result = pd.concat([result], axis=0, keys=['Value'])
+
+        elif not (rows+cols):
+            # special case: [aggs] populated but [rows, cols] empty
+            result = (self.df.copy()[aggs]
+                    #   .sum(numeric_only=True)
+                      .agg(agg_dict)
+                      .to_frame().T # convert series back to dataframe
+                    )
+            
+            # set column name to 'Value'
+            result = result.rename(index={0: 'Value'})
+        else:
+            # general case: [rows, cols, aggs] populated
+            result = (self.df.copy()[rows+cols+aggs]
+                        .groupby(rows+cols)
+                        # .sum(numeric_only=True)
+                        .agg(agg_dict)
                     )
         
             # if rows is empty list, insert a 'Value' level 

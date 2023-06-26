@@ -18,8 +18,8 @@ DONE
 - fix swap buttons 
 - create [categories, values] field types in pivot broker
 - [category, values, (Data)] can only drag-drop to right destinations
-TODO
 - make weight averages work
+TODO
 - make filters work
 - fix `compact_index` if there's only one data field and (Data) is in cols
 """
@@ -629,7 +629,7 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                                            user_data=PivotFieldTypes.Aggregate,
                                            payload_type="PROW") as g:
                                 dpg.add_text("Data: ", indent=10)
-                                create_pivot_idx(parent=ID_DATALIST, label="Volume")
+                                # create_pivot_idx(parent=ID_DATALIST, label="Volume")
                                 
 
                         dpg.set_item_callback(pidx_left, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=False))

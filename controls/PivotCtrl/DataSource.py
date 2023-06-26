@@ -1,21 +1,23 @@
 import random
+from typing import Dict
 
 import pandas as pd
 import numpy as np
 
-from PivotFields import PivotFieldTypes
+from PivotFields import PivotField, PivotFieldTypes
 
-def get_field_data():
+def get_field_data() -> Dict[str, PivotField]:
     return {
-        'Year': PivotFieldTypes.GroupBy.GROUPBY,
-        'Quarter': PivotFieldTypes.GroupBy.GROUPBY,
-        'Fruit': PivotFieldTypes.GroupBy.GROUPBY,
-        'Shape': PivotFieldTypes.GroupBy.GROUPBY,
-        'Vibe': PivotFieldTypes.GroupBy.GROUPBY,
-        'Weight': PivotFieldTypes.Aggregate.SUM,
-        'Volume': PivotFieldTypes.Aggregate.SUM,
-        'Price/kg': PivotFieldTypes.Aggregate.WEIGHTED_AVERAGE,
+        'Year': PivotField('Year', PivotFieldTypes.GroupBy.GROUPBY),
+        'Quarter': PivotField('Quarter', PivotFieldTypes.GroupBy.GROUPBY),
+        'Fruit': PivotField('Fruit', PivotFieldTypes.GroupBy.GROUPBY),
+        'Shape': PivotField('Shape', PivotFieldTypes.GroupBy.GROUPBY),
+        'Vibe': PivotField('Vibe', PivotFieldTypes.GroupBy.GROUPBY),
+        'Weight': PivotField('Weight', PivotFieldTypes.Aggregate.SUM),
+        'Volume': PivotField('Volume', PivotFieldTypes.Aggregate.SUM),
+        'Price/kg': PivotField('Price/kg', PivotFieldTypes.Aggregate.WEIGHTED_AVERAGE, weight_field='Weight'),
     }
+
     
 
 def get_flat_data():
