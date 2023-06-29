@@ -57,12 +57,13 @@ class GridSelector:
         self.table_id = table_id
         self.width = width
         self.height = height
-        # self.widget_grid = []
+        
         self.widget_grid = [[None for _ in range(width)] for _ in range(height)]
         self.dpg_lookup = [[(0,0,0) for _ in range(width)] for _ in range(height)] # [table_id, i, j] for each cell
         self.mouse_drag_coords = [[0,0], [0,0]] # pixel coords
         self.range_coords = [[0,0], [0,0]] # index coords
         self.is_dragging_range = False
+        self._is_paused = False
         self.mouse_registry = -1
         with dpg.handler_registry() as mouse_registry:
             self.mouse_registry = mouse_registry
@@ -77,11 +78,23 @@ class GridSelector:
     def is_empty(self):
         return (len(self.widget_grid) == 0 or len(self.widget_grid[0]) == 0)
 
+    def pause(self):
+        self._is_paused = True
+
+    def unpause(self):
+        self._is_paused = False
+
     def on_mouse_down(self, sender, app_data):
         
+        # bail if paused
+        if(self._is_paused): 
+            return
+
         # bail if widget grid is empty
         if self.is_empty():
             return
+
+        print(self._is_paused)
 
         # test if mouse inside table bounding box
         rect_min = dpg.get_item_rect_min(self.widget_grid[0][0])
@@ -99,10 +112,17 @@ class GridSelector:
             print(f"Mouse down: {column}, {row}")
 
     def on_mouse_drag(self, sender, app_data):
+        
+        # bail if paused
+        if(self._is_paused): 
+            return  None, None
+        
         # bail if widget grid is empty
         if self.is_empty():
             return None, None
         
+        print(self._is_paused)
+
         # Get the ending position of the drag
         rect_min = dpg.get_item_rect_min(self.widget_grid[0][0])
         rect_max = dpg.get_item_rect_max(self.widget_grid[-1][-1])
@@ -134,6 +154,10 @@ class GridSelector:
 
     def on_mouse_up(self, sender, app_data):
         
+        # bail if paused
+        if(self._is_paused): 
+            return 
+
         row, column = self.on_mouse_drag(sender, app_data)
         self.is_dragging_range = False
         print(f"Mouse up: {column}, {row}")

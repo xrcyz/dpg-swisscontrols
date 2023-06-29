@@ -11,6 +11,7 @@ from GridSelector import GridSelector
 from PivotBroker import PivotBroker
 from PivotFields import PivotFieldTypes 
 from ListSelectCtrl import listSelectCtrl
+from PivotFilter import pivotFilterDialog
 
 """
 DONE
@@ -21,6 +22,7 @@ DONE
 - make weight averages work
 TODO
 - make filters work
+- pause grid_select on launch dialogs
 - fix `compact_index` if there's only one data field and (Data) is in cols
 """
 
@@ -269,17 +271,17 @@ def swap_button_labels(selected_tag, forward=True):
 # ===========================
 
 
-def select_fields():
+def configure_fields():
     
-    # TODO pause gridselect when dialog launched
+    # grid_selector.pause()
 
     fields = pivotBroker.get_field_list()
     current_sel = [dpg.get_item_label(id) for id in dpg.get_item_children(ID_FIELDLIST, 1)]
     data = [(label in current_sel, label) for label in fields]
 
-    listSelectCtrl(title="Select fields", data=data, send_data=select_fields_callback)
+    listSelectCtrl(title="Select fields", data=data, send_data=configure_fields_callback)
 
-def select_fields_callback(user_sel):
+def configure_fields_callback(user_sel):
     
     # delete current field list
     fields = dpg.get_item_children(ID_FIELDLIST, 1)
@@ -311,6 +313,7 @@ def select_fields_callback(user_sel):
             dpg.delete_item(btn)
             list_of_pivot_index_buttons.remove(btn)
 
+    
     update_pivot()
     # print(user_sel)
 
@@ -429,11 +432,24 @@ def create_pivot_sel(parent, label):
 
 def create_pivot_filter(parent, field, label):
     drag_tag = dpg.generate_uuid()
-    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW")
+    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW", callback=configure_categorical_filter)
     list_of_pivot_filter_buttons.append(PivotFilterButton(id=b, field=field, label=label))
     with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
         dpg.add_text(label)
 
+# ==========================================
+
+def configure_categorical_filter():
+    
+    # TODO pause gridselect when dialog launched
+
+    data = [(True, '2022'), (True, '2023'), (False, '2024'), (False, '2025')]
+    pivotFilterDialog(title="Filter by", data=data, send_data=configure_categorical_filter_callback)
+
+def configure_categorical_filter_callback(user_sel):
+    print(user_sel)
+
+# ==========================================
 
 
 with dpg.theme() as listbox_theme:
@@ -567,7 +583,7 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
             with dpg.group(horizontal=True): 
                 # ---- field selector
                 with dpg.group(horizontal=False):
-                    dpg.add_button(label="Select: ", callback=select_fields)
+                    dpg.add_button(label="Select: ", callback=configure_fields)
                     with dpg.group(horizontal=True):
                         
                         with dpg.child_window(tag=ID_FIELDLIST, width=80, height=90, drop_callback= on_psel_drop, payload_type="PROW") as id_listbox:
@@ -584,7 +600,7 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                                     no_host_extendX=True, no_pad_innerX=False,
                                     borders_outerH=False, 
                                     borders_outerV=False,
-                                    borders_innerV=False):
+                                    borders_innerV=False, borders_innerH=False):
                     dpg.add_table_column(width=40, width_fixed=True)
                     dpg.add_table_column(width_stretch=True, init_width_or_weight=0.0)
 
@@ -637,6 +653,8 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
 
     update_pivot()
 
+dpg.show_style_editor()
+dpg.show_item_registry()
 
 dpg.show_viewport()
 
