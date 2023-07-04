@@ -7,6 +7,7 @@ import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
 
+from MvItemTypes import MvItemTypes
 from GridSelector import GridSelector
 from PivotBroker import PivotBroker
 from PivotFields import PivotFieldTypes 
@@ -22,14 +23,11 @@ DONE
 - make weight averages work
 TODO
 - make filters work
+  - finish pivotFilterDialog
+- myStyleVar_CellPadding; myStyleVar_SelectableTextAlign
 - pause grid_select on launch dialogs
 - fix `compact_index` if there's only one data field and (Data) is in cols
 """
-
-class MvItemTypes(Enum):
-    Button = 'mvAppItemType::mvButton'
-    Text = 'mvAppItemType::mvText'
-    # Add other item types as needed
 
 # print(f"Test: {MvItemTypes.Button.value == 'mvAppItemType::mvButton'}")
 
@@ -47,14 +45,17 @@ ID_PIVOT_TABLE = dpg.generate_uuid()
 
 pivotBroker = PivotBroker()
 df = pivotBroker.get_pivot(filter=None, 
-                           rows=['Fruit', '(Data)', 'Shape'], # '(Data)', 
-                           cols=['Year'],
-                           aggs=['Weight', 'Volume'])
+                        rows=['Fruit', '(Data)', 'Shape'], # '(Data)', 
+                        cols=['Year'],
+                        aggs=['Weight', 'Volume'])
 
 # print(df)
 # print(df.columns)
 # print(df.shape)
 # print(df.index)
+
+# w_h_c_data = dpg.load_image("controls/assets/partial_check.png")
+# print(w_h_c_data)
 
 def get_column_to_index_treedict(df):
     """
@@ -541,11 +542,11 @@ def update_pivot():
     else:
         # case where columns are multi-index
         with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
-                   header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
-                   row_background=False, no_host_extendX=True, no_pad_innerX=False,
-                   borders_outerH=True, 
-                   borders_outerV=True,
-                   borders_innerV=True):
+                header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
+                row_background=False, no_host_extendX=True, no_pad_innerX=False,
+                borders_outerH=True, 
+                borders_outerV=True,
+                borders_innerV=True):
             # first level name
             dpg.add_table_column() # label=df.columns.names[0])
 
@@ -607,9 +608,9 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                     with dpg.table_row():
                         dpg.add_text("Where: ")
                         with dpg.group(horizontal=False, 
-                                       drop_callback= on_pwhere_drop, 
-                                       user_data=PivotFieldTypes.GroupBy,
-                                       payload_type="PROW") as g:
+                                    drop_callback= on_pwhere_drop, 
+                                    user_data=PivotFieldTypes.GroupBy,
+                                    payload_type="PROW") as g:
                             create_pivot_filter(parent=g, field="Year", label="Year is in [2022, 2023]")
                             create_pivot_filter(parent=g, field="Weight", label="Weight > 0")
                             
@@ -622,30 +623,31 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
 
                         with dpg.group(horizontal=False):
                             with dpg.group(tag=ID_ROWSLIST, horizontal=True, 
-                                           drop_callback= on_pidx_drop, 
-                                           user_data=PivotFieldTypes.GroupBy,
-                                           payload_type="PROW"):
+                                        drop_callback= on_pidx_drop, 
+                                        user_data=PivotFieldTypes.GroupBy,
+                                        payload_type="PROW"):
                                 dpg.add_text("Rows: ", indent=10)
                                 
-                                # create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
+                                create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
                                 create_pivot_idx(parent=ID_ROWSLIST, label="(Data)")
-                                # create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
+                                create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
                                 
                             with dpg.group(tag=ID_COLSLIST, horizontal=True, 
-                                           drop_callback= on_pidx_drop, 
-                                           user_data=PivotFieldTypes.GroupBy,
-                                           payload_type="PROW"):
+                                        drop_callback= on_pidx_drop, 
+                                        user_data=PivotFieldTypes.GroupBy,
+                                        payload_type="PROW"):
                                 dpg.add_text("Columns: ", indent=10)
                                 
-                                # create_pivot_idx(parent=ID_COLSLIST, label="Year")
+                                create_pivot_idx(parent=ID_COLSLIST, label="Year")
                                 
 
                             with dpg.group(tag=ID_DATALIST, horizontal=True, 
-                                           drop_callback= on_pidx_drop, 
-                                           user_data=PivotFieldTypes.Aggregate,
-                                           payload_type="PROW") as g:
+                                        drop_callback= on_pidx_drop, 
+                                        user_data=PivotFieldTypes.Aggregate,
+                                        payload_type="PROW") as g:
                                 dpg.add_text("Data: ", indent=10)
-                                # create_pivot_idx(parent=ID_DATALIST, label="Volume")
+                                create_pivot_idx(parent=ID_DATALIST, label="Volume")
+                                create_pivot_idx(parent=ID_DATALIST, label="Weight")
                                 
 
                         dpg.set_item_callback(pidx_left, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=False))

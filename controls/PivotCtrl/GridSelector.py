@@ -94,7 +94,7 @@ class GridSelector:
         if self.is_empty():
             return
 
-        print(self._is_paused)
+        # print(self._is_paused)
 
         # test if mouse inside table bounding box
         rect_min = dpg.get_item_rect_min(self.widget_grid[0][0])
@@ -121,7 +121,7 @@ class GridSelector:
         if self.is_empty():
             return None, None
         
-        print(self._is_paused)
+        # print(self._is_paused)
 
         # Get the ending position of the drag
         rect_min = dpg.get_item_rect_min(self.widget_grid[0][0])
