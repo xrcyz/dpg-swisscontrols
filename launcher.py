@@ -1,12 +1,22 @@
-# i have no idea what i'm doing
-# this sets the current working directory to the project folder
-# so that relative paths work properly
-# which apparently isn't a native feature of python? 
+# import subprocess
 
-import subprocess
+# subprocess.run(["python", "-m", "./controls/PivotCtrl/demo_PivotCtrl.py"])
 
-subprocess.run(["python", "./controls/PivotCtrl/demo_PivotCtrl.py"])
+"""
+https://stackoverflow.com/questions/14132789/relative-imports-for-the-billionth-time
 
-# import runpy
+"Relative imports use a module's name attribute to determine that module's 
+position in the package hierarchy. If the module's name does not contain any 
+package information (e.g. it is set to 'main') then relative imports are 
+resolved as if the module were a top level module, regardless of where the 
+module is actually located on the file system."
 
-# runpy.run_module(mod_name='controls.PivotCtrl.demo_PivotCtrl', run_name="__main__")
+So if `my_file.py` imports a file from a sister folder, the location is _not_ 
+relative to `my_file.py`, it is relative to wherever the process was initiated. 
+
+"""
+
+# import examples.demo_ListEdtCtrl
+# import examples.demo_CheckListCtrl
+
+import controls.PivotCtrl.demo_PivotCtrl

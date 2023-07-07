@@ -1,7 +1,7 @@
 
 import dearpygui.dearpygui as dpg
 import numpy as np 
-from ListSelectCtrl import listSelectCtrl
+from controls.CheckListCtrl.CheckListCtrl import checkListCtrl
 
 data = []
 for i in range(12):
@@ -18,7 +18,7 @@ dpg.setup_dearpygui()
 
 with dpg.window(tag="window", width=700, height=400):
     
-    dpg.add_button(label="Select", tag=dpg.generate_uuid(), callback=lambda: listSelectCtrl("Select items", data, get_user_selection))
+    dpg.add_button(label="Select", tag=dpg.generate_uuid(), callback=lambda: checkListCtrl("Select items", data, get_user_selection))
 
 dpg.show_viewport()
 

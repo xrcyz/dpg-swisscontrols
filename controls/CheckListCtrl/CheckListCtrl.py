@@ -1,8 +1,14 @@
 import dearpygui.dearpygui as dpg
 from typing import List, Tuple, Callable
 
+"""
+TODO
+- pull the checklist stuff out of PivotFilter.py and into here as CheckListWidget
+- wrap PivotFilter.py around CheckListWidget
 
-def listSelectCtrl(title: str, data: List[Tuple[bool, str]], send_data: Callable[[List[Tuple[bool, str]]], None]):
+"""
+
+def checkListCtrl(title: str, data: List[Tuple[bool, str]], send_data: Callable[[List[Tuple[bool, str]]], None]):
     """
     :param data: A list of [checkbox state, item label] pairs
     :param callback: Callback to send back the user selection

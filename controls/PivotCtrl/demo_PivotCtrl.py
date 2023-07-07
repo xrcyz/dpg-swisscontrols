@@ -7,12 +7,13 @@ import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
 
-from MvItemTypes import MvItemTypes
-from GridSelector import GridSelector
-from PivotBroker import PivotBroker
-from PivotFields import PivotFieldTypes 
-from ListSelectCtrl import listSelectCtrl
-from PivotFilter import pivotFilterDialog
+from controls.DpgHelpers.MvItemTypes import MvItemTypes
+from controls.Textures.TextureIds import TextureIds
+from controls.GridSelector.GridSelector import GridSelector
+from controls.PivotCtrl.PivotBroker import PivotBroker
+from controls.PivotCtrl.PivotFields import PivotFieldTypes 
+from controls.CheckListCtrl.CheckListCtrl import checkListCtrl
+from controls.PivotCtrl.PivotFilter import pivotFilterDialog
 
 """
 DONE
@@ -21,12 +22,14 @@ DONE
 - create [categories, values] field types in pivot broker
 - [category, values, (Data)] can only drag-drop to right destinations
 - make weight averages work
+- finish categorical filter dialog
 TODO
 - make filters work
-  - finish pivotFilterDialog
+    - finish range filter dialog
 - myStyleVar_CellPadding; myStyleVar_SelectableTextAlign
 - pause grid_select on launch dialogs
 - fix `compact_index` if there's only one data field and (Data) is in cols
+- make texture loader check if ID already exists (should be loaded on app start)
 """
 
 # print(f"Test: {MvItemTypes.Button.value == 'mvAppItemType::mvButton'}")
@@ -42,6 +45,20 @@ ID_COLSLIST = dpg.generate_uuid()
 ID_DATALIST = dpg.generate_uuid()
 ID_GRID_SELECT = dpg.generate_uuid()
 ID_PIVOT_TABLE = dpg.generate_uuid()
+
+
+def load_textures():
+    with dpg.texture_registry():
+        for tex_info in TextureIds.get_tex_info():
+            w_h_c_data = dpg.load_image(tex_info.PATH)
+            if(w_h_c_data == None):
+                raise Exception("Failed to load image, check current working directory is project folder.")
+            width, height, channels, im_data = w_h_c_data
+            dpg.add_static_texture(width=width, height=height, default_value=im_data, tag=tex_info.UUID)
+
+load_textures()
+# print(dpg.does_alias_exist('3215'))
+# print(dpg.does_item_exist('3215'))
 
 pivotBroker = PivotBroker()
 df = pivotBroker.get_pivot(filter=None, 
@@ -280,7 +297,7 @@ def configure_fields():
     current_sel = [dpg.get_item_label(id) for id in dpg.get_item_children(ID_FIELDLIST, 1)]
     data = [(label in current_sel, label) for label in fields]
 
-    listSelectCtrl(title="Select fields", data=data, send_data=configure_fields_callback)
+    checkListCtrl(title="Select fields", data=data, send_data=configure_fields_callback)
 
 def configure_fields_callback(user_sel):
     

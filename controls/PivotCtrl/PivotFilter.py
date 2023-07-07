@@ -1,12 +1,19 @@
 import dearpygui.dearpygui as dpg
-from MvItemTypes import MvItemTypes
 from typing import List, Tuple, Callable
 from enum import Enum
+
+from controls.DpgHelpers.MvItemTypes import MvItemTypes
+from controls.Textures.TextureIds import TextureIds
 
 def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Callable[[List[Tuple[bool, str]]], None]):
     """
     :param data: A list of [checkbox state, item label] pairs
     :param callback: Callback to send back the user selection
+
+    TODO: 
+    - change Tuple[bool, str] to a dataclass
+    - dynamically set the checkbox size
+        - checkbox_size = font_size + 2*frame_padding
     """
     
     ID_MODAL = dpg.generate_uuid()
@@ -15,18 +22,12 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
     ID_OK = dpg.generate_uuid()
     ID_WINDOW_HANDLER = dpg.generate_uuid()
 
-    TEX_BASE = dpg.generate_uuid()
+    TEX_PARTIAL_CHECK = TextureIds.ID_PARTIAL_CHECK.UUID
     ID_MCB_CHECKBOX = dpg.generate_uuid()
     ID_MCB_LABEL = dpg.generate_uuid()
-    custom_checkbox_theme = dpg.generate_uuid()
+    ID_CHECKBOX_THEME = dpg.generate_uuid()
 
     child_checkboxes = []
-
-    #if I move this line down to `with dpg.texture_registry()`, then it fails to resolve..........????
-    
-    # print(w_h_c_data)
-    # import os
-    # print(os.getcwd())
 
     # resize the child window on resize modal window
     def resize_window(sender, data):
@@ -36,16 +37,8 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
         pos = [dpg.get_item_width(ID_MODAL) - 75*2-16, dpg.get_item_height(ID_MODAL) - 30]
         dpg.configure_item(ID_OK, pos = pos)
 
-    # get texture for partial checkbox
-    with dpg.texture_registry():
-        w_h_c_data = dpg.load_image("controls/assets/partial_check.png")
-        if(w_h_c_data == None):
-            raise Exception("Failed to load image, check current working directory is project folder.")
-        width, height, channels, im_data = w_h_c_data
-        dpg.add_static_texture(width=width, height=height, default_value=im_data, tag=TEX_BASE)
-    
     # get theme for partial checkbox
-    with dpg.theme(tag=custom_checkbox_theme):
+    with dpg.theme(tag=ID_CHECKBOX_THEME):
         with dpg.theme_component(dpg.mvImageButton):
             dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 0, 0)
 
@@ -59,6 +52,7 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
         if dpg.does_item_exist(ID_MCB_CHECKBOX):
             dpg.delete_item(ID_MCB_CHECKBOX)
         
+        # print(init_state)
         dpg.add_checkbox(before=ID_MCB_LABEL, tag=ID_MCB_CHECKBOX, default_value=init_state, callback=on_mcb_click)
 
         for ccb in child_checkboxes:
@@ -72,12 +66,11 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
         if set_checked or set_unchecked:
             on_mcb_check(set_checked)
         else:
-            dpg.add_image_button(before=ID_MCB_LABEL, tag=ID_MCB_CHECKBOX, texture_tag=TEX_BASE, height=19, width=19, callback=on_mcb_check, show=True)
-            dpg.bind_item_theme(ID_MCB_CHECKBOX, custom_checkbox_theme)
+            dpg.add_image_button(before=ID_MCB_LABEL, tag=ID_MCB_CHECKBOX, texture_tag=TEX_PARTIAL_CHECK, height=19, width=19, callback=lambda: on_mcb_check(init_state=True), show=True)
+            dpg.bind_item_theme(ID_MCB_CHECKBOX, ID_CHECKBOX_THEME)
 
     def on_ccb_click():
         # on child checkbox click
-
         set_checked = all(dpg.get_value(e[0]) for e in child_checkboxes)
         set_unchecked = not any(dpg.get_value(e[0]) for e in child_checkboxes)
 
@@ -89,8 +82,8 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
                 on_mcb_check(set_checked)
         else:
             dpg.delete_item(ID_MCB_CHECKBOX)
-            dpg.add_image_button(before=ID_MCB_LABEL, tag=ID_MCB_CHECKBOX, texture_tag=TEX_BASE, height=19, width=19, callback=on_mcb_check, show=True)
-            dpg.bind_item_theme(ID_MCB_CHECKBOX, custom_checkbox_theme)
+            dpg.add_image_button(before=ID_MCB_LABEL, tag=ID_MCB_CHECKBOX, texture_tag=TEX_PARTIAL_CHECK, height=19, width=19, callback=lambda: on_mcb_check(init_state=True), show=True)
+            dpg.bind_item_theme(ID_MCB_CHECKBOX, ID_CHECKBOX_THEME)
 
     # build dialog
     with dpg.window(label=title, 
@@ -115,13 +108,11 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
             display_text = f'[{", ".join(checked_items) }]'
             dpg.set_value(summary_checked, display_text)
 
-        # dpg.add_separator()
         with dpg.child_window(tag=ID_CHILD_WINDOW):
             # master checkbox
             with dpg.group(horizontal=True):
-                # dpg.add_checkbox(default_value=False, tag=ID_MCB_CHECKBOX)
                 dpg.add_text("All Items", tag=ID_MCB_LABEL)
-                on_mcb_init()
+                on_mcb_init() # inserts checkbox before 'All Items'
                 
             # child checkboxes
             dpg.add_separator()
@@ -138,11 +129,13 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
             dpg.delete_item(ID_MODAL)
 
         def on_cancel():
+            # delete the window and all children
             dpg.delete_item(ID_MODAL)
+            # delete the resize callback handler
             dpg.delete_item(ID_WINDOW_HANDLER)
-
-            # delete custom theme
-            # deregister texture
+            # delete the checkbox theme
+            dpg.delete_item(ID_CHECKBOX_THEME)
+            # do not delete the texture - that is not our job
         
         with dpg.group(horizontal=True):
             # TODO figure out how to get element heights

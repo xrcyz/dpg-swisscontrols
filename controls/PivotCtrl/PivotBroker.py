@@ -3,10 +3,11 @@ import dataclasses
 from enum import Enum
 from typing import Dict
 
-from DataSource import get_flat_data, get_field_data
-from PivotFields import PivotField, PivotFieldTypes
 import pandas as pd
 import numpy as np
+
+from controls.PivotCtrl.DataSource import get_flat_data, get_field_data
+from controls.PivotCtrl.PivotFields import PivotField, PivotFieldTypes
 
 class PivotBroker:
     # mediator between PivotCtrl and DataSource

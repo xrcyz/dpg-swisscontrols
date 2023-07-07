@@ -2,8 +2,8 @@
 import dearpygui.dearpygui as dpg
 import numpy as np 
 
-from DataGrid import DataGrid
-from ListEditCtrl import listEditCtrl
+from controls.ListEditCtrl.DataGrid import DataGrid
+from controls.ListEditCtrl.ListEditCtrl import listEditCtrl
 
 commit_grid = DataGrid(
     title="Commit History",

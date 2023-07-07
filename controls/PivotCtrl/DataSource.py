@@ -4,7 +4,7 @@ from typing import Dict
 import pandas as pd
 import numpy as np
 
-from PivotFields import PivotField, PivotFieldTypes
+from controls.PivotCtrl.PivotFields import PivotField, PivotFieldTypes
 
 def get_field_data() -> Dict[str, PivotField]:
     return {
