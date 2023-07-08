@@ -3,6 +3,7 @@ from typing import List, Tuple, Callable
 from enum import Enum
 
 from controls.DpgHelpers.MvItemTypes import MvItemTypes
+from controls.DpgHelpers.MvStyleVar import MvStyleVar
 from controls.Textures.TextureIds import TextureIds
 
 def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Callable[[List[Tuple[bool, str]]], None]):
@@ -27,12 +28,18 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
     ID_MCB_LABEL = dpg.generate_uuid()
     ID_CHECKBOX_THEME = dpg.generate_uuid()
 
+    ID_SCRIPT_INPUT = dpg.generate_uuid()
+
     child_checkboxes = []
 
     # resize the child window on resize modal window
     def resize_window(sender, data):
         windowHeight = dpg.get_item_height(ID_MODAL)
+        windowWidth = dpg.get_item_width(ID_MODAL)
+        mvStyleVar_WindowPadding = 9
+
         dpg.configure_item(ID_CHILD_WINDOW, height = windowHeight - 95)
+        dpg.configure_item(ID_SCRIPT_INPUT, width = windowWidth - 4*MvStyleVar.WindowPadding.value)
 
         pos = [dpg.get_item_width(ID_MODAL) - 75*2-16, dpg.get_item_height(ID_MODAL) - 30]
         dpg.configure_item(ID_OK, pos = pos)
@@ -100,28 +107,39 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
                 dpg.add_text("Year")
                 dpg.add_combo(items=["is in", "is not in"], default_value="is in", width=100)
                 # summary_checked = dpg.add_text("[2022, 2023]")
-            summary_checked = dpg.add_text("[2022, 2023]", wrap=195)
+            # summary_checked = dpg.add_text("[2022, 2023]", wrap=195)
         
         # method to update displayed text
-        def checked_callback(sender):
-            checked_items = [dpg.get_value(e[1]) for e in child_checkboxes if dpg.get_value(e[0])]
-            display_text = f'[{", ".join(checked_items) }]'
-            dpg.set_value(summary_checked, display_text)
+        # def checked_callback(sender):
+        #     checked_items = [dpg.get_value(e[1]) for e in child_checkboxes if dpg.get_value(e[0])]
+        #     display_text = f'[{", ".join(checked_items) }]'
+        #     dpg.set_value(summary_checked, display_text)
 
         with dpg.child_window(tag=ID_CHILD_WINDOW):
-            # master checkbox
-            with dpg.group(horizontal=True):
-                dpg.add_text("All Items", tag=ID_MCB_LABEL)
-                on_mcb_init() # inserts checkbox before 'All Items'
+            
+            with dpg.tab_bar():
                 
-            # child checkboxes
-            dpg.add_separator()
-            for [checkbox_state, item_label] in data:
-                with dpg.group(horizontal=True):
-                    b = dpg.add_checkbox(default_value=checkbox_state, callback=on_ccb_click)
-                    t = dpg.add_text(item_label)
-                    child_checkboxes.append((b, t))
+                # categorical filtering
+                with dpg.tab(label="List", closable=False):
+                    # master checkbox
+                    with dpg.group(horizontal=True):
+                        dpg.add_text("All Items", tag=ID_MCB_LABEL)
+                        on_mcb_init() # inserts checkbox before 'All Items'
+                        
+                    # child checkboxes
+                    dpg.add_separator()
+                    for [checkbox_state, item_label] in data:
+                        with dpg.group(horizontal=True):
+                            b = dpg.add_checkbox(default_value=checkbox_state, callback=on_ccb_click)
+                            t = dpg.add_text(item_label)
+                            child_checkboxes.append((b, t))
 
+                # range filtering
+                with dpg.tab(label="Range", closable=False):
+                    with dpg.group(horizontal=True):
+                        my_expr = "0 <= x < 100"
+                        dpg.add_input_text(tag=ID_SCRIPT_INPUT, default_value=my_expr, multiline=True, height=100) # , 
+                    
 
         def on_ok():
             ret = [(dpg.get_value(e[0]), dpg.get_value(e[1])) for e in child_checkboxes]

@@ -30,6 +30,7 @@ TODO
 - pause grid_select on launch dialogs
 - fix `compact_index` if there's only one data field and (Data) is in cols
 - make texture loader check if ID already exists (should be loaded on app start)
+- enable sorting?
 """
 
 # print(f"Test: {MvItemTypes.Button.value == 'mvAppItemType::mvButton'}")
@@ -45,6 +46,7 @@ ID_COLSLIST = dpg.generate_uuid()
 ID_DATALIST = dpg.generate_uuid()
 ID_GRID_SELECT = dpg.generate_uuid()
 ID_PIVOT_TABLE = dpg.generate_uuid()
+
 
 
 def load_textures():
