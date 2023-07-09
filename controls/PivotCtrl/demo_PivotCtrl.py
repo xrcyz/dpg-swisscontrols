@@ -452,21 +452,22 @@ def create_pivot_sel(parent, label):
 
 def create_pivot_filter(parent, field, label):
     drag_tag = dpg.generate_uuid()
-    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW", callback=configure_categorical_filter)
+    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW", callback=show_pivotFilterDialog)
     list_of_pivot_filter_buttons.append(PivotFilterButton(id=b, field=field, label=label))
     with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
         dpg.add_text(label)
 
 # ==========================================
 
-def configure_categorical_filter():
+def show_pivotFilterDialog():
     
     # TODO pause gridselect when dialog launched
 
-    data = [(True, '2022'), (True, '2023'), (False, '2024'), (False, '2025')]
-    pivotFilterDialog(title="Filter by", data=data, send_data=configure_categorical_filter_callback)
+    # data = [(True, '2022'), (True, '2023'), (False, '2024'), (False, '2025')]
+    data = [(True, 'Apple'), (True, 'Banana'), (False, 'Cherry'), (False, 'Fig')]
+    pivotFilterDialog(title="Filter by", field="Fruit", data=data, send_data=pivotFilterDialog_callback)
 
-def configure_categorical_filter_callback(user_sel):
+def pivotFilterDialog_callback(user_sel):
     print(user_sel)
 
 # ==========================================

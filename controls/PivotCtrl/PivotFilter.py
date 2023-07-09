@@ -6,7 +6,7 @@ from controls.DpgHelpers.MvItemTypes import MvItemTypes
 from controls.DpgHelpers.MvStyleVar import MvStyleVar
 from controls.Textures.TextureIds import TextureIds
 
-def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Callable[[List[Tuple[bool, str]]], None]):
+def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send_data: Callable[[List[Tuple[bool, str]]], None]):
     """
     :param data: A list of [checkbox state, item label] pairs
     :param callback: Callback to send back the user selection
@@ -20,6 +20,9 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
     ID_MODAL = dpg.generate_uuid()
     ID_HEADER = dpg.generate_uuid()
     ID_CHILD_WINDOW = dpg.generate_uuid()
+    ID_TABBAR = dpg.generate_uuid()
+    ID_TAB_LIST = dpg.generate_uuid()
+    ID_TAB_RANGE = dpg.generate_uuid()
     ID_OK = dpg.generate_uuid()
     ID_WINDOW_HANDLER = dpg.generate_uuid()
 
@@ -36,7 +39,6 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
     def resize_window(sender, data):
         windowHeight = dpg.get_item_height(ID_MODAL)
         windowWidth = dpg.get_item_width(ID_MODAL)
-        mvStyleVar_WindowPadding = 9
 
         dpg.configure_item(ID_CHILD_WINDOW, height = windowHeight - 95)
         dpg.configure_item(ID_SCRIPT_INPUT, width = windowWidth - 4*MvStyleVar.WindowPadding.value)
@@ -47,6 +49,7 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
     # get theme for partial checkbox
     with dpg.theme(tag=ID_CHECKBOX_THEME):
         with dpg.theme_component(dpg.mvImageButton):
+            # remove frame padding around image button
             dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 0, 0)
 
     def on_mcb_click(sender):
@@ -104,7 +107,7 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
 
         with dpg.group(tag=ID_HEADER, horizontal=False):
             with dpg.group(horizontal=True):
-                dpg.add_text("Year")
+                dpg.add_text(field)
                 dpg.add_combo(items=["is in", "is not in"], default_value="is in", width=100)
                 # summary_checked = dpg.add_text("[2022, 2023]")
             # summary_checked = dpg.add_text("[2022, 2023]", wrap=195)
@@ -117,10 +120,9 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
 
         with dpg.child_window(tag=ID_CHILD_WINDOW):
             
-            with dpg.tab_bar():
-                
+            with dpg.tab_bar(tag=ID_TABBAR):
                 # categorical filtering
-                with dpg.tab(label="List", closable=False):
+                with dpg.tab(tag=ID_TAB_LIST, label="List", closable=False):
                     # master checkbox
                     with dpg.group(horizontal=True):
                         dpg.add_text("All Items", tag=ID_MCB_LABEL)
@@ -135,16 +137,38 @@ def pivotFilterDialog(title: str, data: List[Tuple[bool, str]], send_data: Calla
                             child_checkboxes.append((b, t))
 
                 # range filtering
-                with dpg.tab(label="Range", closable=False):
+                with dpg.tab(tag=ID_TAB_RANGE, label="Range", closable=False):
                     with dpg.group(horizontal=True):
                         my_expr = "0 <= x < 100"
                         dpg.add_input_text(tag=ID_SCRIPT_INPUT, default_value=my_expr, multiline=True, height=100) # , 
                     
 
         def on_ok():
-            ret = [(dpg.get_value(e[0]), dpg.get_value(e[1])) for e in child_checkboxes]
-            send_data(ret)
-            dpg.delete_item(ID_MODAL)
+            # somehow we've got to return a lambda to the PivotBroker from the Range tab
+            # so maybe we convert the checklist to a lambda?
+            # df['Year'].isin(['2022', '2023']) doesn't sound that hard tbh.
+            # otherwise we have to support two return methods
+            # which is doable, we just have two callbacks in the method call.
+            # we also need some guards around the field type to disable range filtering on sets
+            # and consider whether this code is shared with range filters on value fields
+            # maybe instead of `field: str` we have `field: PivotFilterField`
+            # aaaand we have to send back some text to update the button sender
+
+            if dpg.get_value(ID_TABBAR) == ID_TAB_LIST:
+                # return from checklist tab
+                # gather the data
+                ret = [(dpg.get_value(e[0]), dpg.get_value(e[1])) for e in child_checkboxes]
+                # delete the dialog
+                on_cancel()
+                # send the data
+                send_data(ret)
+            else: 
+                # return from range tab
+                ret = [(dpg.get_value(e[0]), dpg.get_value(e[1])) for e in child_checkboxes]
+                # delete the dialog
+                on_cancel()
+                # send the data
+                send_data(ret)
 
         def on_cancel():
             # delete the window and all children
