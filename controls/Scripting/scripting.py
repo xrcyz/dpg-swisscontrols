@@ -1,7 +1,56 @@
 import ast
 import operator as op
+from typing import List, Union, Tuple, Callable
 
-def create_lambda_from_expression(expr, allowed_vars):
+"""
+TODO
+- return error messages instead of raising exceptions
+"""
+
+def create_combined_lambdas(lambdas: List[Callable]) -> Callable:
+    """
+    Takes a list of lambda functions and returns a new function that,
+    when called with a row of a DataFrame, returns True only if all of the
+    lambda functions in the list return True for that row.
+
+    Parameters
+    ----------
+    lambdas : List[Callable]
+        A list of lambda functions that take a DataFrame row and return a bool.
+
+    Returns
+    -------
+    Callable
+        A function that takes a DataFrame row and returns a bool.
+    """
+
+    def filter_func(row):
+        # apply each lambda to the row and check if all return True
+        return all(f(row) for f in lambdas)
+
+    return filter_func
+
+def create_lambda_from_checklist(column: str, include_items: List[Union[str, int]]):
+    """
+    Create a lambda function to filter a DataFrame based on multiple conditions.
+
+    Args:
+        column: A column name in a dataframe.
+        include_items: A list of items to include from that column.
+
+    Returns:
+        callable: A lambda function which when applied to a DataFrame, filters the DataFrame based 
+        on the conditions provided.
+
+    Usage:
+    >>> lambda = construct_filter_lambda('Fruit',  ['Pear'])
+    >>> filtered_df = df[df.apply(lambda, axis=1)]
+    """
+    def filter_func(row):
+        return row[column] in include_items
+    return filter_func
+
+def create_lambda_from_expression(expr: str, allowed_vars: List[str]):
     """
     Create a lambda function from a given string expression. 
 

@@ -5,6 +5,7 @@ from enum import Enum
 from controls.DpgHelpers.MvItemTypes import MvItemTypes
 from controls.DpgHelpers.MvStyleVar import MvStyleVar
 from controls.Textures.TextureIds import TextureIds
+from controls.Scripting.scripting import create_lambda_from_checklist, create_lambda_from_expression
 
 def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send_data: Callable[[List[Tuple[bool, str]]], None]):
     """
@@ -21,7 +22,7 @@ def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send
     ID_HEADER = dpg.generate_uuid()
     ID_CHILD_WINDOW = dpg.generate_uuid()
     ID_TABBAR = dpg.generate_uuid()
-    ID_TAB_LIST = dpg.generate_uuid()
+    ID_TAB_CATEGORY = dpg.generate_uuid()
     ID_TAB_RANGE = dpg.generate_uuid()
     ID_OK = dpg.generate_uuid()
     ID_WINDOW_HANDLER = dpg.generate_uuid()
@@ -122,7 +123,7 @@ def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send
             
             with dpg.tab_bar(tag=ID_TABBAR):
                 # categorical filtering
-                with dpg.tab(tag=ID_TAB_LIST, label="List", closable=False):
+                with dpg.tab(tag=ID_TAB_CATEGORY, label="List", closable=False):
                     # master checkbox
                     with dpg.group(horizontal=True):
                         dpg.add_text("All Items", tag=ID_MCB_LABEL)
@@ -139,36 +140,34 @@ def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send
                 # range filtering
                 with dpg.tab(tag=ID_TAB_RANGE, label="Range", closable=False):
                     with dpg.group(horizontal=True):
-                        my_expr = "0 <= x < 100"
-                        dpg.add_input_text(tag=ID_SCRIPT_INPUT, default_value=my_expr, multiline=True, height=100) # , 
+                        my_expr = f"0 <= {field} < 100"
+                        dpg.add_input_text(tag=ID_SCRIPT_INPUT, default_value=my_expr, multiline=True, height=100) 
                     
 
         def on_ok():
-            # somehow we've got to return a lambda to the PivotBroker from the Range tab
-            # so maybe we convert the checklist to a lambda?
-            # df['Year'].isin(['2022', '2023']) doesn't sound that hard tbh.
-            # otherwise we have to support two return methods
-            # which is doable, we just have two callbacks in the method call.
-            # we also need some guards around the field type to disable range filtering on sets
-            # and consider whether this code is shared with range filters on value fields
-            # maybe instead of `field: str` we have `field: PivotFilterField`
-            # aaaand we have to send back some text to update the button sender
-
-            if dpg.get_value(ID_TABBAR) == ID_TAB_LIST:
-                # return from checklist tab
+            # it makes sense that this dialog returns a lambda to PivotBroker so it can do `df[df.apply(my_lambda, axis=1)]`
+            # it returns a different lambda for Category and Value fields
+            # and also returns some label text to the button sender
+            
+            # return category or range filter 
+            if dpg.get_value(ID_TABBAR) == ID_TAB_CATEGORY:
                 # gather the data
-                ret = [(dpg.get_value(e[0]), dpg.get_value(e[1])) for e in child_checkboxes]
+                include_items = [dpg.get_value(item[1]) for item in child_checkboxes if dpg.get_value(item[0])]
+                # construct the filter lambda
+                my_lambda = create_lambda_from_checklist(field,  include_items)
                 # delete the dialog
                 on_cancel()
-                # send the data
-                send_data(ret)
+                # send the data _after_ deleting the dialog
+                send_data(my_lambda)
             else: 
-                # return from range tab
-                ret = [(dpg.get_value(e[0]), dpg.get_value(e[1])) for e in child_checkboxes]
+                # gather the data
+                my_expr = dpg.get_value(ID_SCRIPT_INPUT)
+                # TODO we should get df.columns in here somehow...
+                my_lambda = create_lambda_from_expression(expr=my_expr, allowed_vars=[field])
                 # delete the dialog
                 on_cancel()
-                # send the data
-                send_data(ret)
+                # send the data _after_ deleting the dialog
+                send_data(my_lambda)
 
         def on_cancel():
             # delete the window and all children

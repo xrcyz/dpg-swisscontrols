@@ -49,7 +49,7 @@ class PivotBroker:
     
     def get_field_type(self, field_name):
         if (field_name == "(Data)"):
-            return PivotFieldTypes.GroupBy.GROUPBY
+            return PivotFieldTypes.GroupBy.CATEGORY
         
         if field_name not in self.field_data:
             raise Exception(f"The field '{field_name}' does not exist.")
@@ -58,6 +58,9 @@ class PivotBroker:
     def custom_weighted_average(self, series: pd.Series) -> float:
         weight_col = self.field_data[series.name].weight_field
         return np.average(series, weights=self.df.loc[series.index, weight_col])
+
+    def get_filtered(self, filter):
+        return self.df[self.df.apply(filter, axis=1)]
 
     def get_pivot(self, 
                   filter: list[str], 

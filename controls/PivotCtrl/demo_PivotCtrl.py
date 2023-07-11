@@ -23,9 +23,12 @@ DONE
 - [category, values, (Data)] can only drag-drop to right destinations
 - make weight averages work
 - finish categorical filter dialog
+- finish range filter dialog
 TODO
 - make filters work
-    - finish range filter dialog
+    - move lambdas into a dict
+    - send lambdas to pivotBroker
+    - send df.columns to pivotFilterDialog somehow
 - myStyleVar_CellPadding; myStyleVar_SelectableTextAlign
 - pause grid_select on launch dialogs
 - fix `compact_index` if there's only one data field and (Data) is in cols
@@ -467,8 +470,9 @@ def show_pivotFilterDialog():
     data = [(True, 'Apple'), (True, 'Banana'), (False, 'Cherry'), (False, 'Fig')]
     pivotFilterDialog(title="Filter by", field="Fruit", data=data, send_data=pivotFilterDialog_callback)
 
-def pivotFilterDialog_callback(user_sel):
-    print(user_sel)
+def pivotFilterDialog_callback(user_lambda):
+    # keep the lambdas in a dict, indexed by the ID of the filter button
+    print(pivotBroker.get_filtered(user_lambda))
 
 # ==========================================
 

@@ -8,11 +8,11 @@ from controls.PivotCtrl.PivotFields import PivotField, PivotFieldTypes
 
 def get_field_data() -> Dict[str, PivotField]:
     return {
-        'Year': PivotField('Year', PivotFieldTypes.GroupBy.GROUPBY),
-        'Quarter': PivotField('Quarter', PivotFieldTypes.GroupBy.GROUPBY),
-        'Fruit': PivotField('Fruit', PivotFieldTypes.GroupBy.GROUPBY),
-        'Shape': PivotField('Shape', PivotFieldTypes.GroupBy.GROUPBY),
-        'Vibe': PivotField('Vibe', PivotFieldTypes.GroupBy.GROUPBY),
+        'Year': PivotField('Year', PivotFieldTypes.GroupBy.ORDINAL),
+        'Quarter': PivotField('Quarter', PivotFieldTypes.GroupBy.ORDINAL),
+        'Fruit': PivotField('Fruit', PivotFieldTypes.GroupBy.CATEGORY),
+        'Shape': PivotField('Shape', PivotFieldTypes.GroupBy.CATEGORY),
+        'Vibe': PivotField('Vibe', PivotFieldTypes.GroupBy.CATEGORY),
         'Weight': PivotField('Weight', PivotFieldTypes.Aggregate.SUM),
         'Volume': PivotField('Volume', PivotFieldTypes.Aggregate.SUM),
         'Price/kg': PivotField('Price/kg', PivotFieldTypes.Aggregate.WEIGHTED_AVERAGE, weight_field='Weight'),
