@@ -1,13 +1,14 @@
 
 import dataclasses
 from enum import Enum
-from typing import Dict
+from typing import List, Dict, Callable
 
 import pandas as pd
 import numpy as np
 
 from controls.PivotCtrl.DataSource import get_flat_data, get_field_data
 from controls.PivotCtrl.PivotFields import PivotField, PivotFieldTypes
+from controls.Scripting.scripting import create_combined_lambdas
 
 class PivotBroker:
     # mediator between PivotCtrl and DataSource
@@ -63,10 +64,10 @@ class PivotBroker:
         return self.df[self.df.apply(filter, axis=1)]
 
     def get_pivot(self, 
-                  filter: list[str], 
-                  rows: list[str], 
-                  cols: list[str], 
-                  aggs: list[str]):
+                  filters: List[Callable], 
+                  rows: List[str], 
+                  cols: List[str], 
+                  aggs: List[str]):
         
         """
         :param rows: A list of fields to become index in the returned dataframe
@@ -76,6 +77,12 @@ class PivotBroker:
         A special string '(Data)' indicates the level of the `aggs` fields in one of the MultiIndexes.
         """
         
+        if not filters:
+            filtered_df = self.df
+        else:
+            combined_lambda = create_combined_lambdas(lambdas=filters)
+            filtered_df = self.df[self.df.apply(combined_lambda, axis=1)]
+
         agg_dict = {field: self.field_data[field].agg_func for field in aggs}
         # if 'Price/kg' in agg_dict:
         #     agg_dict['Price/kg'] = self.custom_weighted_average
@@ -104,7 +111,7 @@ class PivotBroker:
             return result    
         elif not (aggs):
             # special case: [rows, cols] populated but [aggs] empty
-            result = (self.df.copy()[rows+cols+aggs]
+            result = (filtered_df[rows+cols+aggs]
                         .groupby(rows+cols)
                         .sum(numeric_only=True)
                         # .agg(agg_dict)
@@ -116,7 +123,7 @@ class PivotBroker:
 
         elif not (rows+cols):
             # special case: [aggs] populated but [rows, cols] empty
-            result = (self.df.copy()[aggs]
+            result = (filtered_df.copy()[aggs]
                     #   .sum(numeric_only=True)
                       .agg(agg_dict)
                       .to_frame().T # convert series back to dataframe
@@ -126,7 +133,7 @@ class PivotBroker:
             result = result.rename(index={0: 'Value'})
         else:
             # general case: [rows, cols, aggs] populated
-            result = (self.df.copy()[rows+cols+aggs]
+            result = (filtered_df.copy()[rows+cols+aggs]
                         .groupby(rows+cols)
                         # .sum(numeric_only=True)
                         .agg(agg_dict)

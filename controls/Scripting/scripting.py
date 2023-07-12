@@ -13,15 +13,17 @@ def create_combined_lambdas(lambdas: List[Callable]) -> Callable:
     when called with a row of a DataFrame, returns True only if all of the
     lambda functions in the list return True for that row.
 
-    Parameters
-    ----------
-    lambdas : List[Callable]
+    Args:
+    lambdas: List[Callable]
         A list of lambda functions that take a DataFrame row and return a bool.
 
-    Returns
-    -------
+    Returns:
     Callable
         A function that takes a DataFrame row and returns a bool.
+
+    Usage:
+    >>> lambdas = create_combined_lambdas(list_of_lambdas)
+    >>> filtered_df = df[df.apply(lambdas, axis=1)]
     """
 
     def filter_func(row):

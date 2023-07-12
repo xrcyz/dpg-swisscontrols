@@ -1,13 +1,22 @@
 import dearpygui.dearpygui as dpg
 from typing import List, Tuple, Callable
 from enum import Enum
+import dataclasses
 
 from controls.DpgHelpers.MvItemTypes import MvItemTypes
 from controls.DpgHelpers.MvStyleVar import MvStyleVar
 from controls.Textures.TextureIds import TextureIds
 from controls.Scripting.scripting import create_lambda_from_checklist, create_lambda_from_expression
 
-def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send_data: Callable[[List[Tuple[bool, str]]], None]):
+
+@dataclasses.dataclass
+class PivotFilterButton:
+    id: str
+    field: str
+    label: str
+    filter: Callable
+
+def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], sender: str, send_data: Callable[[List[Tuple[bool, str]]], None]):
     """
     :param data: A list of [checkbox state, item label] pairs
     :param callback: Callback to send back the user selection
@@ -158,7 +167,7 @@ def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send
                 # delete the dialog
                 on_cancel()
                 # send the data _after_ deleting the dialog
-                send_data(my_lambda)
+                send_data(sender, my_lambda)
             else: 
                 # gather the data
                 my_expr = dpg.get_value(ID_SCRIPT_INPUT)
@@ -167,7 +176,7 @@ def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send
                 # delete the dialog
                 on_cancel()
                 # send the data _after_ deleting the dialog
-                send_data(my_lambda)
+                send_data(sender, my_lambda)
 
         def on_cancel():
             # delete the window and all children

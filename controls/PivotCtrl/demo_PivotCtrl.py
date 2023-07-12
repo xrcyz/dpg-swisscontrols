@@ -1,7 +1,7 @@
 
 import itertools
 from enum import Enum
-import dataclasses
+
 
 import dearpygui.dearpygui as dpg
 import pandas as pd
@@ -13,7 +13,7 @@ from controls.GridSelector.GridSelector import GridSelector
 from controls.PivotCtrl.PivotBroker import PivotBroker
 from controls.PivotCtrl.PivotFields import PivotFieldTypes 
 from controls.CheckListCtrl.CheckListCtrl import checkListCtrl
-from controls.PivotCtrl.PivotFilter import pivotFilterDialog
+from controls.PivotCtrl.PivotFilter import PivotFilterButton, pivotFilterDialog
 
 """
 DONE
@@ -29,6 +29,7 @@ TODO
     - move lambdas into a dict
     - send lambdas to pivotBroker
     - send df.columns to pivotFilterDialog somehow
+    - send df.uniques to pivotFilterDialog 
 - myStyleVar_CellPadding; myStyleVar_SelectableTextAlign
 - pause grid_select on launch dialogs
 - fix `compact_index` if there's only one data field and (Data) is in cols
@@ -66,7 +67,7 @@ load_textures()
 # print(dpg.does_item_exist('3215'))
 
 pivotBroker = PivotBroker()
-df = pivotBroker.get_pivot(filter=None, 
+df = pivotBroker.get_pivot(filters=None, 
                         rows=['Fruit', '(Data)', 'Shape'], # '(Data)', 
                         cols=['Year'],
                         aggs=['Weight', 'Volume'])
@@ -342,16 +343,10 @@ def configure_fields_callback(user_sel):
 
 # ===========================
 
-@dataclasses.dataclass
-class PivotFilterButton:
-    id: str
-    field: str
-    label: str
-
 selected_pivot_index = -1
 list_of_pivot_field_selectables = []
 list_of_pivot_index_buttons = []
-list_of_pivot_filter_buttons = []
+dict_of_pivot_filter_buttons = {}
 
 def on_pidx_swap(selected_tag, forward=True):
     swap_button_labels(selected_tag, forward)
@@ -456,23 +451,27 @@ def create_pivot_sel(parent, label):
 def create_pivot_filter(parent, field, label):
     drag_tag = dpg.generate_uuid()
     b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW", callback=show_pivotFilterDialog)
-    list_of_pivot_filter_buttons.append(PivotFilterButton(id=b, field=field, label=label))
+    dict_of_pivot_filter_buttons[b] = PivotFilterButton(id=b, field=field, label=label, filter=lambda row: True)
     with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
         dpg.add_text(label)
 
 # ==========================================
 
-def show_pivotFilterDialog():
+def show_pivotFilterDialog(sender):
     
     # TODO pause gridselect when dialog launched
-
+    print(dict_of_pivot_filter_buttons.keys())
     # data = [(True, '2022'), (True, '2023'), (False, '2024'), (False, '2025')]
-    data = [(True, 'Apple'), (True, 'Banana'), (False, 'Cherry'), (False, 'Fig')]
-    pivotFilterDialog(title="Filter by", field="Fruit", data=data, send_data=pivotFilterDialog_callback)
+    data = [(True, 'Apple'), (True, 'Pear'), (False, 'Cherry'), (False, 'Fig')]
+    pivotFilterDialog(title="Filter by", field="Fruit", data=data, sender=sender, send_data=pivotFilterDialog_callback)
 
-def pivotFilterDialog_callback(user_lambda):
+def pivotFilterDialog_callback(sender, user_lambda):
     # keep the lambdas in a dict, indexed by the ID of the filter button
-    print(pivotBroker.get_filtered(user_lambda))
+    
+    dict_of_pivot_filter_buttons[sender].filter = user_lambda
+    update_pivot()
+    
+    # print(pivotBroker.get_filtered(user_lambda))
 
 # ==========================================
 
@@ -514,11 +513,12 @@ def update_pivot():
     global column_names_to_absolute_column_index
     # global absolute_column_index_to_column_names
 
+    filters = [item.filter for item in dict_of_pivot_filter_buttons.values()]
     rows = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_ROWSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
     cols = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_COLSLIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
     aggs = [dpg.get_item_label(item) for item in dpg.get_item_children(ID_DATALIST, 1) if (dpg.get_item_type(item) == MvItemTypes.Button.value)]
     
-    df = pivotBroker.get_pivot(filter=None, 
+    df = pivotBroker.get_pivot(filters=filters, 
                                 rows=rows, 
                                 cols=cols,
                                 aggs=aggs)
@@ -635,8 +635,8 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                                     drop_callback= on_pwhere_drop, 
                                     user_data=PivotFieldTypes.GroupBy,
                                     payload_type="PROW") as g:
-                            create_pivot_filter(parent=g, field="Year", label="Year is in [2022, 2023]")
-                            create_pivot_filter(parent=g, field="Weight", label="Weight > 0")
+                            create_pivot_filter(parent=g, field="Fruit", label="Fruit") # Year is in [2022, 2023]
+                            # create_pivot_filter(parent=g, field="Weight", label="Weight") # Weight > 0
                             
                     with dpg.table_row():
                         with dpg.group(horizontal=False):
