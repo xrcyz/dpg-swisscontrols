@@ -4,33 +4,33 @@ from typing import Dict
 import pandas as pd
 import numpy as np
 
-from controls.PivotCtrl.PivotFields import PivotField, PivotFieldTypes
+from controls.PivotCtrl.PivotField import PivotField, PivotFieldType
 
 def get_field_data() -> Dict[str, PivotField]:
     return {
-        'Year': PivotField('Year', PivotFieldTypes.GroupBy.ORDINAL),
-        'Quarter': PivotField('Quarter', PivotFieldTypes.GroupBy.ORDINAL),
-        'Fruit': PivotField('Fruit', PivotFieldTypes.GroupBy.CATEGORY),
-        'Shape': PivotField('Shape', PivotFieldTypes.GroupBy.CATEGORY),
-        'Vibe': PivotField('Vibe', PivotFieldTypes.GroupBy.CATEGORY),
-        'Weight': PivotField('Weight', PivotFieldTypes.Aggregate.SUM),
-        'Volume': PivotField('Volume', PivotFieldTypes.Aggregate.SUM),
-        'Price/kg': PivotField('Price/kg', PivotFieldTypes.Aggregate.WEIGHTED_AVERAGE, weight_field='Weight'),
+        'Year': PivotField('Year', PivotFieldType.GroupBy.ORDINAL),
+        'Quarter': PivotField('Quarter', PivotFieldType.GroupBy.ORDINAL),
+        'Fruit': PivotField('Fruit', PivotFieldType.GroupBy.CATEGORY),
+        'Shape': PivotField('Shape', PivotFieldType.GroupBy.CATEGORY),
+        'Vibe': PivotField('Vibe', PivotFieldType.GroupBy.CATEGORY),
+        'Weight': PivotField('Weight', PivotFieldType.Aggregate.SUM),
+        'Volume': PivotField('Volume', PivotFieldType.Aggregate.SUM),
+        'Price/kg': PivotField('Price/kg', PivotFieldType.Aggregate.WEIGHTED_AVERAGE, weight_field='Weight'),
     }
 
     
 
 def get_flat_data():
     # Number of rows to generate
-    n_rows = 100
+    n_rows = 10
 
     # Random fruits
-    vibe = random.choices(["High", "Low"], k=n_rows)
-    fruits = random.choices(["Apple", "Pear"], k=n_rows)
-    grade = random.choices(["Round", "Square"], k=n_rows)
+    vibe = random.choices(["Cool", "Calm", "Chill", "Fire", "Deep"], k=n_rows)
+    fruits = random.choices(["Apple", "Pear", "Cherry", "Fig", "Banana"], k=n_rows)
+    grade = random.choices(["Round", "Square", "Star", "Cone", "Torus"], k=n_rows)
 
     # Random years and months
-    years = random.choices([2022, 2023], k=n_rows)
+    years = random.choices([2022, 2023, 2024, 2025, 2026, 2027], k=n_rows)
     quarters = random.choices(np.arange(1,5), k=n_rows)
 
     # Random weights and volumes

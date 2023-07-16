@@ -17,7 +17,7 @@ print(s >= 'Second')
 ```
 """
 
-class PivotFieldTypes:
+class PivotFieldType:
     class GroupBy(Enum):
         CATEGORY = 1
         ORDINAL = 2

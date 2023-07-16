@@ -8,10 +8,11 @@ import pandas as pd
 import numpy as np
 
 from controls.DpgHelpers.MvItemTypes import MvItemTypes
+from controls.DpgHelpers.MvStyleVar import calc_single_window_height_from_items, calc_multi_window_height_in_table_rows
 from controls.Textures.TextureIds import TextureIds
 from controls.GridSelector.GridSelector import GridSelector
 from controls.PivotCtrl.PivotBroker import PivotBroker
-from controls.PivotCtrl.PivotFields import PivotFieldTypes 
+from controls.PivotCtrl.PivotField import PivotFieldType 
 from controls.CheckListCtrl.CheckListCtrl import checkListCtrl
 from controls.PivotCtrl.PivotFilter import PivotFilterButton, pivotFilterDialog
 
@@ -24,17 +25,24 @@ DONE
 - make weight averages work
 - finish categorical filter dialog
 - finish range filter dialog
-TODO
 - make filters work
     - move lambdas into a dict
     - send lambdas to pivotBroker
+TODO
+- make filters work
     - send df.columns to pivotFilterDialog somehow
-    - send df.uniques to pivotFilterDialog 
+    - send df.uniques to pivotFilterDialog
+    - make category lambda work on numeric dtypes 
+    - should pivotFilterDialog return a PivotFilterButton? Yes.
+- create PivotFilterState for loading, saving, and querying PivotBroker
+- how to create an empty group (for Where lane)?
 - myStyleVar_CellPadding; myStyleVar_SelectableTextAlign
 - pause grid_select on launch dialogs
 - fix `compact_index` if there's only one data field and (Data) is in cols
 - make texture loader check if ID already exists (should be loaded on app start)
 - enable sorting?
+- move the 'failed drag' code into a method
+- fix whatever bug is in the compact_index method 
 """
 
 # print(f"Test: {MvItemTypes.Button.value == 'mvAppItemType::mvButton'}")
@@ -50,7 +58,7 @@ ID_COLSLIST = dpg.generate_uuid()
 ID_DATALIST = dpg.generate_uuid()
 ID_GRID_SELECT = dpg.generate_uuid()
 ID_PIVOT_TABLE = dpg.generate_uuid()
-
+ID_PIVOT_CONFIG_WINDOW = dpg.generate_uuid()
 
 
 def load_textures():
@@ -371,7 +379,45 @@ def on_psel_drop(drop_sender, drag_sender):
     update_pivot()
 
 def on_pwhere_drop(drop_sender, drag_sender):
+    """
+    Handles drag-drop onto [Where] lanes.
+    - Check if the drag field type matches the accepted payload type (GroupBy or Aggregate)
+    - Delete the caller if caller was a pidx_button
+    - Create a new pidx_button at the drop site
+    """
     print(f"Dropped {drag_sender} onto {drop_sender}")
+    field_name = dpg.get_item_label(drag_sender)
+    drag_field_instance = pivotBroker.get_field_type(field_name) # category or aggregate field
+
+    global dict_of_pivot_filter_buttons
+
+    # special case for '(Data)' 
+    if field_name=='(Data)':
+        # delete the previous popup
+        if(dpg.does_item_exist("popup_reject_drop")):
+            dpg.delete_item("popup_reject_drop")
+        
+        with dpg.window(popup=True, tag="popup_reject_drop", height=24) as popup:
+            dpg.add_text(f"Can't drop '(data)' into a 'Where' lane.")
+
+        return
+
+    # deal with duplicates
+    if field_name in [f.field for f in dict_of_pivot_filter_buttons.values()]:
+        return
+
+    # on drag from other lanes
+    if drag_sender in list_of_pivot_index_buttons:
+        create_pivot_filter(parent=drop_sender, field=field_name, label=field_name, field_type=drag_field_instance)
+        dpg.delete_item(drag_sender)
+        list_of_pivot_index_buttons.remove(drag_sender)
+
+    # on drag from field list
+    elif drag_sender in list_of_pivot_field_selectables:
+        create_pivot_filter(parent=drop_sender, field=field_name, label=f"{field_name} is in [values]", field_type=drag_field_instance)
+
+    update_pivot()
+
 
 def on_pidx_drop(drop_sender, drag_sender):
     """
@@ -390,8 +436,8 @@ def on_pidx_drop(drop_sender, drag_sender):
         if(dpg.does_item_exist("popup_reject_drop")):
             dpg.delete_item("popup_reject_drop")
         
-        drag_type_str = "GroupBy" if isinstance(drag_field_instance, PivotFieldTypes.GroupBy) else "Data"
-        drop_type_str = "GroupBy" if (drop_field_type == PivotFieldTypes.GroupBy) else "Data"
+        drag_type_str = "GroupBy" if isinstance(drag_field_instance, PivotFieldType.GroupBy) else "Data"
+        drop_type_str = "GroupBy" if (drop_field_type == PivotFieldType.GroupBy) else "Data"
 
         with dpg.window(popup=True, tag="popup_reject_drop", height=24) as popup:
             dpg.add_text(f"Can't drop a '{drag_type_str}' field into a '{drop_type_str}' lane.")
@@ -448,22 +494,54 @@ def create_pivot_sel(parent, label):
     with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
         dpg.add_text(label)
 
-def create_pivot_filter(parent, field, label):
+def create_pivot_filter(parent, field: str, label: str, field_type: PivotFieldType):
+    
+    # print(type(field_type))
+
     drag_tag = dpg.generate_uuid()
-    b = dpg.add_button(tag=drag_tag, label=label, parent=parent, payload_type="PROW", callback=show_pivotFilterDialog)
-    dict_of_pivot_filter_buttons[b] = PivotFilterButton(id=b, field=field, label=label, filter=lambda row: True)
+    b = dpg.add_button(
+        tag=drag_tag, 
+        label=label, 
+        parent=parent, 
+        payload_type="PROW", 
+        callback=show_pivotFilterDialog
+    )
+
+    dict_of_pivot_filter_buttons[b] = PivotFilterButton(id=b, field=field, label=label, filter=lambda row: True, field_type=field_type)
+
+    # TODO move this into its own method
+    # resize filter window
+    count_items = len(dict_of_pivot_filter_buttons.keys())
+    height = calc_single_window_height_from_items(count_items=count_items)
+    dpg.configure_item(parent, height = height)
+    # resize the parent window
+    height = calc_multi_window_height_in_table_rows(count_items_in_each_window=[count_items, 3])
+    dpg.configure_item(ID_PIVOT_CONFIG_WINDOW, height = height)
+
+    
     with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
-        dpg.add_text(label)
+        dpg.add_text(field)
 
 # ==========================================
 
 def show_pivotFilterDialog(sender):
     
     # TODO pause gridselect when dialog launched
-    print(dict_of_pivot_filter_buttons.keys())
-    # data = [(True, '2022'), (True, '2023'), (False, '2024'), (False, '2025')]
-    data = [(True, 'Apple'), (True, 'Pear'), (False, 'Cherry'), (False, 'Fig')]
-    pivotFilterDialog(title="Filter by", field="Fruit", data=data, sender=sender, send_data=pivotFilterDialog_callback)
+    
+    global pivotBroker
+    global dict_of_pivot_filter_buttons
+    field = dict_of_pivot_filter_buttons[sender].field
+
+    # if sender is an aggregate field, disable categorical filtering and force range filtering
+
+
+    # we need to check if this field has already been filtered
+    # and if so, build the filter list for the dialog
+    data = [(True, val) for val in pivotBroker.get_uniques(field)]
+    # sort the data alphabetically
+    data = sorted(data, key=lambda item: item[1])
+    
+    pivotFilterDialog(title="Filter by", field=field, data=data, sender=sender, send_data=pivotFilterDialog_callback)
 
 def pivotFilterDialog_callback(sender, user_lambda):
     # keep the lambdas in a dict, indexed by the ID of the filter button
@@ -602,7 +680,7 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
     # dpg.add_button(label='Update table', callback=update_pivot)
     
     with dpg.collapsing_header(label="Setup"):
-        with dpg.child_window(height=135) as w:
+        with dpg.child_window(tag=ID_PIVOT_CONFIG_WINDOW):
             
             # ---- horizontal splot
             with dpg.group(horizontal=True): 
@@ -631,11 +709,14 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
 
                     with dpg.table_row():
                         dpg.add_text("Where: ")
-                        with dpg.group(horizontal=False, 
+                        # with dpg.group(horizontal=False, 
+                        #             drop_callback= on_pwhere_drop, 
+                        #             payload_type="PROW") as g:
+                            
+                        dpg.add_child_window(height=calc_single_window_height_from_items(1), 
                                     drop_callback= on_pwhere_drop, 
-                                    user_data=PivotFieldTypes.GroupBy,
-                                    payload_type="PROW") as g:
-                            create_pivot_filter(parent=g, field="Fruit", label="Fruit") # Year is in [2022, 2023]
+                                    payload_type="PROW")
+                            # create_pivot_filter(parent=g, field="Fruit", label="Fruit is any value", field_type=PivotFieldType.GroupBy.CATEGORY) # Year is in [2022, 2023]
                             # create_pivot_filter(parent=g, field="Weight", label="Weight") # Weight > 0
                             
                     with dpg.table_row():
@@ -645,37 +726,40 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                                 pidx_left = dpg.add_button(arrow=True, direction=dpg.mvDir_Left)
                                 pidx_right = dpg.add_button(arrow=True, direction=dpg.mvDir_Right)
 
-                        with dpg.group(horizontal=False):
-                            with dpg.group(tag=ID_ROWSLIST, horizontal=True, 
-                                        drop_callback= on_pidx_drop, 
-                                        user_data=PivotFieldTypes.GroupBy,
-                                        payload_type="PROW"):
-                                dpg.add_text("Rows: ", indent=10)
-                                
-                                create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
-                                create_pivot_idx(parent=ID_ROWSLIST, label="(Data)")
-                                create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
-                                
-                            with dpg.group(tag=ID_COLSLIST, horizontal=True, 
-                                        drop_callback= on_pidx_drop, 
-                                        user_data=PivotFieldTypes.GroupBy,
-                                        payload_type="PROW"):
-                                dpg.add_text("Columns: ", indent=10)
-                                
-                                create_pivot_idx(parent=ID_COLSLIST, label="Year")
-                                
+                        with dpg.child_window():
+                            with dpg.group(horizontal=False):
+                                with dpg.group(tag=ID_ROWSLIST, horizontal=True, 
+                                            drop_callback= on_pidx_drop, 
+                                            user_data=PivotFieldType.GroupBy,
+                                            payload_type="PROW"):
+                                    dpg.add_text("Rows: ", indent=10)
+                                    
+                                    # create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
+                                    # create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
+                                    
+                                with dpg.group(tag=ID_COLSLIST, horizontal=True, 
+                                            drop_callback= on_pidx_drop, 
+                                            user_data=PivotFieldType.GroupBy,
+                                            payload_type="PROW"):
+                                    dpg.add_text("Columns: ", indent=10)
+                                    
+                                    # create_pivot_idx(parent=ID_COLSLIST, label="Year")
+                                    create_pivot_idx(parent=ID_ROWSLIST, label="(Data)")
 
-                            with dpg.group(tag=ID_DATALIST, horizontal=True, 
-                                        drop_callback= on_pidx_drop, 
-                                        user_data=PivotFieldTypes.Aggregate,
-                                        payload_type="PROW") as g:
-                                dpg.add_text("Data: ", indent=10)
-                                create_pivot_idx(parent=ID_DATALIST, label="Volume")
-                                create_pivot_idx(parent=ID_DATALIST, label="Weight")
+                                with dpg.group(tag=ID_DATALIST, horizontal=True, 
+                                            drop_callback= on_pidx_drop, 
+                                            user_data=PivotFieldType.Aggregate,
+                                            payload_type="PROW") as g:
+                                    dpg.add_text("Data: ", indent=10)
+                                    # create_pivot_idx(parent=ID_DATALIST, label="Volume")
+                                    # create_pivot_idx(parent=ID_DATALIST, label="Weight")
                                 
 
                         dpg.set_item_callback(pidx_left, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=False))
                         dpg.set_item_callback(pidx_right, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=True))
+
+        height = calc_multi_window_height_in_table_rows(count_items_in_each_window=[1, 3])
+        dpg.configure_item(ID_PIVOT_CONFIG_WINDOW, height = height)
 
     update_pivot()
 

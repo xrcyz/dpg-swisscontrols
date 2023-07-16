@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 from controls.PivotCtrl.DataSource import get_flat_data, get_field_data
-from controls.PivotCtrl.PivotFields import PivotField, PivotFieldTypes
+from controls.PivotCtrl.PivotField import PivotField, PivotFieldType
 from controls.Scripting.scripting import create_combined_lambdas
 
 class PivotBroker:
@@ -33,14 +33,14 @@ class PivotBroker:
 
         # assign the aggregation functions to local PivotBroker functions
         self.aggregation_functions = {
-            PivotFieldTypes.Aggregate.SUM: 'sum',
-            PivotFieldTypes.Aggregate.WEIGHTED_AVERAGE: self.custom_weighted_average,
-            PivotFieldTypes.Aggregate.COUNT: 'count',
+            PivotFieldType.Aggregate.SUM: 'sum',
+            PivotFieldType.Aggregate.WEIGHTED_AVERAGE: self.custom_weighted_average,
+            PivotFieldType.Aggregate.COUNT: 'count',
             # define other aggregation functions here...
         }
 
         for name, field in self.field_data.items():
-            if isinstance(field.field_type, PivotFieldTypes.Aggregate):
+            if isinstance(field.field_type, PivotFieldType.Aggregate):
                 field.agg_func = self.aggregation_functions[field.field_type]
 
     def get_field_list(self):
@@ -50,11 +50,16 @@ class PivotBroker:
     
     def get_field_type(self, field_name):
         if (field_name == "(Data)"):
-            return PivotFieldTypes.GroupBy.CATEGORY
+            return PivotFieldType.GroupBy.CATEGORY
         
         if field_name not in self.field_data:
             raise Exception(f"The field '{field_name}' does not exist.")
         return self.field_data[field_name].field_type
+
+    def get_uniques(self, field_name):
+        if field_name not in self.field_data:
+            raise Exception(f"The field '{field_name}' does not exist.")
+        return self.df[field_name].unique()
 
     def custom_weighted_average(self, series: pd.Series) -> float:
         weight_col = self.field_data[series.name].weight_field

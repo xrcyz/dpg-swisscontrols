@@ -7,6 +7,7 @@ from controls.DpgHelpers.MvItemTypes import MvItemTypes
 from controls.DpgHelpers.MvStyleVar import MvStyleVar
 from controls.Textures.TextureIds import TextureIds
 from controls.Scripting.scripting import create_lambda_from_checklist, create_lambda_from_expression
+from controls.PivotCtrl.PivotField import PivotFieldType
 
 
 @dataclasses.dataclass
@@ -15,6 +16,7 @@ class PivotFilterButton:
     field: str
     label: str
     filter: Callable
+    field_type: PivotFieldType
 
 def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], sender: str, send_data: Callable[[List[Tuple[bool, str]]], None]):
     """
@@ -51,7 +53,7 @@ def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send
         windowWidth = dpg.get_item_width(ID_MODAL)
 
         dpg.configure_item(ID_CHILD_WINDOW, height = windowHeight - 95)
-        dpg.configure_item(ID_SCRIPT_INPUT, width = windowWidth - 4*MvStyleVar.WindowPadding.value)
+        dpg.configure_item(ID_SCRIPT_INPUT, width = windowWidth - 4*MvStyleVar.WindowPadding.value[1])
 
         pos = [dpg.get_item_width(ID_MODAL) - 75*2-16, dpg.get_item_height(ID_MODAL) - 30]
         dpg.configure_item(ID_OK, pos = pos)
@@ -154,14 +156,14 @@ def pivotFilterDialog(title: str, field: str, data: List[Tuple[bool, str]], send
                     
 
         def on_ok():
-            # it makes sense that this dialog returns a lambda to PivotBroker so it can do `df[df.apply(my_lambda, axis=1)]`
-            # it returns a different lambda for Category and Value fields
-            # and also returns some label text to the button sender
+            # change this to return a PivotFilterButton
             
             # return category or range filter 
             if dpg.get_value(ID_TABBAR) == ID_TAB_CATEGORY:
                 # gather the data
-                include_items = [dpg.get_value(item[1]) for item in child_checkboxes if dpg.get_value(item[0])]
+                # retain the original datatype from 'data', don't just read the string label off the UI
+                include_items = [data[i][1] for i, item in enumerate(child_checkboxes) if dpg.get_value(item[0])]
+
                 # construct the filter lambda
                 my_lambda = create_lambda_from_checklist(field,  include_items)
                 # delete the dialog
