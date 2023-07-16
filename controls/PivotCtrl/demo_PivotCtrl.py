@@ -8,7 +8,8 @@ import pandas as pd
 import numpy as np
 
 from controls.DpgHelpers.MvItemTypes import MvItemTypes
-from controls.DpgHelpers.MvStyleVar import calc_single_window_height_from_items, calc_multi_window_height_in_table_rows
+from controls.DpgHelpers.MvThemeCol import MvThemeCol
+from controls.DpgHelpers.Layouts import calc_single_window_height_from_items, calc_multi_window_height_in_table_rows
 from controls.Textures.TextureIds import TextureIds
 from controls.GridSelector.GridSelector import GridSelector
 from controls.PivotCtrl.PivotBroker import PivotBroker
@@ -28,14 +29,17 @@ DONE
 - make filters work
     - move lambdas into a dict
     - send lambdas to pivotBroker
+    - make category lambda work on numeric dtypes 
 TODO
+- use child windows for lane drag-drops
 - make filters work
     - send df.columns to pivotFilterDialog somehow
     - send df.uniques to pivotFilterDialog
-    - make category lambda work on numeric dtypes 
+    - make dragging from filter to groupby work
+    - make dragging from filter to field list work
     - should pivotFilterDialog return a PivotFilterButton? Yes.
 - create PivotFilterState for loading, saving, and querying PivotBroker
-- how to create an empty group (for Where lane)?
+- theming ID_PIVOT_GROUPBY_WINDOW?
 - myStyleVar_CellPadding; myStyleVar_SelectableTextAlign
 - pause grid_select on launch dialogs
 - fix `compact_index` if there's only one data field and (Data) is in cols
@@ -43,6 +47,9 @@ TODO
 - enable sorting?
 - move the 'failed drag' code into a method
 - fix whatever bug is in the compact_index method 
+- fix the resizing hacks in create_pivot_filter
+  - switch to recursive function using a tree
+  - account for minimum height of field list -> multiple columns in a group
 """
 
 # print(f"Test: {MvItemTypes.Button.value == 'mvAppItemType::mvButton'}")
@@ -51,7 +58,7 @@ dpg.create_context()
 dpg.create_viewport(title='Custom Title', width=800, height=600)
 dpg.setup_dearpygui()
 
-ID_PIVOT_PARENT = dpg.generate_uuid()
+ID_PIVOT_PARENT_WINDOW = dpg.generate_uuid()
 ID_FIELDLIST = dpg.generate_uuid()
 ID_ROWSLIST = dpg.generate_uuid()
 ID_COLSLIST = dpg.generate_uuid()
@@ -59,7 +66,8 @@ ID_DATALIST = dpg.generate_uuid()
 ID_GRID_SELECT = dpg.generate_uuid()
 ID_PIVOT_TABLE = dpg.generate_uuid()
 ID_PIVOT_CONFIG_WINDOW = dpg.generate_uuid()
-
+ID_PIVOT_FILTER_WINDOW = dpg.generate_uuid()
+ID_PIVOT_GROUPBY_WINDOW = dpg.generate_uuid()
 
 def load_textures():
     with dpg.texture_registry():
@@ -504,19 +512,24 @@ def create_pivot_filter(parent, field: str, label: str, field_type: PivotFieldTy
         label=label, 
         parent=parent, 
         payload_type="PROW", 
-        callback=show_pivotFilterDialog
+        callback=show_pivotFilterDialog,
+        # indent=10
     )
 
     dict_of_pivot_filter_buttons[b] = PivotFilterButton(id=b, field=field, label=label, filter=lambda row: True, field_type=field_type)
 
     # TODO move this into its own method
+    # and account for min height set by field list
     # resize filter window
     count_items = len(dict_of_pivot_filter_buttons.keys())
+    print(count_items)
     height = calc_single_window_height_from_items(count_items=count_items)
-    dpg.configure_item(parent, height = height)
+    dpg.configure_item(ID_PIVOT_FILTER_WINDOW, height = height)
     # resize the parent window
-    height = calc_multi_window_height_in_table_rows(count_items_in_each_window=[count_items, 3])
-    dpg.configure_item(ID_PIVOT_CONFIG_WINDOW, height = height)
+    # hack to get things working until we do it properly
+    if count_items > 1:
+        height = calc_multi_window_height_in_table_rows(count_items_in_each_window=[count_items, 3])
+        dpg.configure_item(ID_PIVOT_CONFIG_WINDOW, height = height)
 
     
     with dpg.drag_payload(parent=b, payload_type="PROW", drag_data=drag_tag, drop_data="drop data"):
@@ -557,7 +570,7 @@ def pivotFilterDialog_callback(sender, user_lambda):
 with dpg.theme() as listbox_theme:
     with dpg.theme_component(dpg.mvSelectable):
         dpg.add_theme_color(dpg.mvThemeCol_Header, (0.26 * 255, 0.59 * 255, 0.98 * 255, 0.31 * 255))
-    with dpg.theme_component(dpg.mvAll):
+    with dpg.theme_component(dpg.mvChildWindow):
         # dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (150, 100, 100), category=dpg.mvThemeCat_Core)
         # dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (255,255,255,255), category=dpg.mvThemeCat_Core)
         dpg.add_theme_color(dpg.mvThemeCol_ChildBg, (51,51,55,255), category=dpg.mvThemeCat_Core)
@@ -573,8 +586,24 @@ with dpg.theme() as selected_button:
         # myStyleVar_FrameBorderSize
         # FrameBorder
 
+with dpg.theme() as filter_window_theme:
+    with dpg.theme_component(dpg.mvChildWindow):
+        dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 8, 0)
+        dpg.add_theme_color(dpg.mvThemeCol_Border, MvThemeCol.WindowBg.value, category=dpg.mvThemeCat_Core)
+    #     dpg.add_theme_color(dpg.mvThemeCol_ChildBg, (51,51,55,255), category=dpg.mvThemeCat_Core)
+    # with dpg.theme_component(dpg.mvButton):
+    #     dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (10,10,10,255), category=dpg.mvThemeCat_Core)
+
+with dpg.theme() as groupby_window_theme:
+    with dpg.theme_component(dpg.mvChildWindow):
+        dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 8, 0)
+        dpg.add_theme_color(dpg.mvThemeCol_Border, MvThemeCol.WindowBg.value, category=dpg.mvThemeCat_Core)
+    #     dpg.add_theme_color(dpg.mvThemeCol_ChildBg, (51,51,55,255), category=dpg.mvThemeCat_Core)
+    # with dpg.theme_component(dpg.mvButton):
+    #     dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (10,10,10,255), category=dpg.mvThemeCat_Core)
 
 # ===========================
+
 
 
 def delete_pivot():
@@ -611,7 +640,7 @@ def update_pivot():
     # print(pretty_df_index)
         
     if not isinstance(df.columns, pd.MultiIndex):
-        with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
+        with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT_WINDOW,
                 header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
                 row_background=False, no_host_extendX=True, no_pad_innerX=False,
                 borders_outerH=True, 
@@ -643,7 +672,7 @@ def update_pivot():
                         ]
     else:
         # case where columns are multi-index
-        with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT,
+        with dpg.table(tag=ID_PIVOT_TABLE, parent=ID_PIVOT_PARENT_WINDOW,
                 header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp,
                 row_background=False, no_host_extendX=True, no_pad_innerX=False,
                 borders_outerH=True, 
@@ -675,7 +704,7 @@ def update_pivot():
 
 # ===========================
 
-with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
+with dpg.window(tag=ID_PIVOT_PARENT_WINDOW, width=700, height=600):
     
     # dpg.add_button(label='Update table', callback=update_pivot)
     
@@ -713,11 +742,12 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                         #             drop_callback= on_pwhere_drop, 
                         #             payload_type="PROW") as g:
                             
-                        dpg.add_child_window(height=calc_single_window_height_from_items(1), 
-                                    drop_callback= on_pwhere_drop, 
-                                    payload_type="PROW")
-                            # create_pivot_filter(parent=g, field="Fruit", label="Fruit is any value", field_type=PivotFieldType.GroupBy.CATEGORY) # Year is in [2022, 2023]
-                            # create_pivot_filter(parent=g, field="Weight", label="Weight") # Weight > 0
+                        dpg.add_child_window(id=ID_PIVOT_FILTER_WINDOW,
+                                             height=calc_single_window_height_from_items(count_items=1), 
+                                             drop_callback= on_pwhere_drop, 
+                                             payload_type="PROW")
+                        # create_pivot_filter(parent=ID_PIVOT_FILTER_WINDOW, field="Fruit", label="Fruit is any value", field_type=PivotFieldType.GroupBy.CATEGORY) # Year is in [2022, 2023]
+                        # create_pivot_filter(parent=ID_PIVOT_FILTER_WINDOW, field="Weight", label="Weight", field_type=PivotFieldType.Aggregate) # Weight > 0
                             
                     with dpg.table_row():
                         with dpg.group(horizontal=False):
@@ -726,40 +756,50 @@ with dpg.window(tag=ID_PIVOT_PARENT, width=700, height=600):
                                 pidx_left = dpg.add_button(arrow=True, direction=dpg.mvDir_Left)
                                 pidx_right = dpg.add_button(arrow=True, direction=dpg.mvDir_Right)
 
-                        with dpg.child_window():
-                            with dpg.group(horizontal=False):
-                                with dpg.group(tag=ID_ROWSLIST, horizontal=True, 
-                                            drop_callback= on_pidx_drop, 
-                                            user_data=PivotFieldType.GroupBy,
-                                            payload_type="PROW"):
-                                    dpg.add_text("Rows: ", indent=10)
-                                    
-                                    # create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
-                                    # create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
-                                    
-                                with dpg.group(tag=ID_COLSLIST, horizontal=True, 
-                                            drop_callback= on_pidx_drop, 
-                                            user_data=PivotFieldType.GroupBy,
-                                            payload_type="PROW"):
-                                    dpg.add_text("Columns: ", indent=10)
-                                    
-                                    # create_pivot_idx(parent=ID_COLSLIST, label="Year")
-                                    create_pivot_idx(parent=ID_ROWSLIST, label="(Data)")
+                        # with dpg.child_window(id=ID_PIVOT_GROUPBY_WINDOW):
+                        with dpg.group(horizontal=False):
+                            with dpg.group(tag=ID_ROWSLIST, horizontal=True, 
+                                        drop_callback= on_pidx_drop, 
+                                        user_data=PivotFieldType.GroupBy,
+                                        payload_type="PROW"):
+                                dpg.add_text("Rows: ", indent=10)
+                                
+                                # create_pivot_idx(parent=ID_ROWSLIST, label="Fruit")
+                                # create_pivot_idx(parent=ID_ROWSLIST, label="Shape")
+                                
+                                
+                            with dpg.group(tag=ID_COLSLIST, horizontal=True, 
+                                        drop_callback= on_pidx_drop, 
+                                        user_data=PivotFieldType.GroupBy,
+                                        payload_type="PROW"):
+                                dpg.add_text("Columns: ", indent=10)
+                                
+                                # create_pivot_idx(parent=ID_COLSLIST, label="Year")
+                                create_pivot_idx(parent=ID_COLSLIST, label="(Data)")
 
-                                with dpg.group(tag=ID_DATALIST, horizontal=True, 
-                                            drop_callback= on_pidx_drop, 
-                                            user_data=PivotFieldType.Aggregate,
-                                            payload_type="PROW") as g:
-                                    dpg.add_text("Data: ", indent=10)
-                                    # create_pivot_idx(parent=ID_DATALIST, label="Volume")
-                                    # create_pivot_idx(parent=ID_DATALIST, label="Weight")
+                            with dpg.group(tag=ID_DATALIST, horizontal=True, 
+                                        drop_callback= on_pidx_drop, 
+                                        user_data=PivotFieldType.Aggregate,
+                                        payload_type="PROW") as g:
+                                dpg.add_text("Data: ", indent=10)
+                                # create_pivot_idx(parent=ID_DATALIST, label="Volume")
+                                # create_pivot_idx(parent=ID_DATALIST, label="Weight")
                                 
 
                         dpg.set_item_callback(pidx_left, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=False))
                         dpg.set_item_callback(pidx_right, lambda: on_pidx_swap(selected_tag=selected_pivot_index, forward=True))
 
-        height = calc_multi_window_height_in_table_rows(count_items_in_each_window=[1, 3])
-        dpg.configure_item(ID_PIVOT_CONFIG_WINDOW, height = height)
+        # align items in groupby window
+        dpg.bind_item_theme(ID_PIVOT_FILTER_WINDOW, filter_window_theme)
+        # dpg.bind_item_theme(ID_PIVOT_GROUPBY_WINDOW, groupby_window_theme)
+
+        # # WIP sus
+        # height = calc_single_window_height_from_items(count_items=3)
+        # dpg.configure_item(ID_PIVOT_GROUPBY_WINDOW, height = height)
+        count_filters = len(dict_of_pivot_filter_buttons.keys())
+        height = calc_multi_window_height_in_table_rows(count_items_in_each_window=[count_filters, 3])
+        # have to account for max height across multiple columns in a window
+        dpg.configure_item(ID_PIVOT_CONFIG_WINDOW, height = max(130, height))
 
     update_pivot()
 
