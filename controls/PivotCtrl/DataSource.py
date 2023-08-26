@@ -25,7 +25,7 @@ def get_flat_data():
     n_rows = 10
 
     # Random fruits
-    vibe = random.choices(["Cool", "Calm", "Chill", "Fire", "Deep"], k=n_rows)
+    vibe = random.choices(["Relaxing", "Ambient", "Chill", "Flawless"], k=n_rows)
     fruits = random.choices(["Apple", "Pear", "Cherry", "Fig", "Banana"], k=n_rows)
     grade = random.choices(["Round", "Square", "Star", "Cone", "Torus"], k=n_rows)
 

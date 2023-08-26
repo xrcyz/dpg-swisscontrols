@@ -19,4 +19,6 @@ relative to `my_file.py`, it is relative to wherever the process was initiated.
 # import examples.demo_ListEdtCtrl
 # import examples.demo_CheckListCtrl
 
-import controls.PivotCtrl.demo_PivotCtrl
+# import controls.PivotCtrl.demo_PivotCtrl
+
+import controls.FileOpenDialog.FileOpenDialog

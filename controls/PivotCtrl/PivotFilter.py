@@ -6,7 +6,7 @@ import dataclasses
 from controls.DpgHelpers.MvItemTypes import MvItemTypes
 from controls.DpgHelpers.MvStyleVar import MvStyleVar
 from controls.Textures.TextureIds import TextureIds
-from controls.Scripting.scripting import create_lambda_from_checklist, create_lambda_from_expression
+from controls.UserScripts.user_scripts import create_lambda_from_checklist, create_lambda_from_expression
 from controls.PivotCtrl.PivotField import PivotFieldType
 
 
