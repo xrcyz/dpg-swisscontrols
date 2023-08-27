@@ -1,11 +1,31 @@
 import dearpygui.dearpygui as dpg
 import os
+from datetime import datetime
 
 from dataclasses import dataclass
+from typing import Optional, List, Tuple
 
 from controls.DpgHelpers.MvThemeCol import MvThemeCol
 from controls.DpgHelpers.MvStyleVar import MvStyleVar
 from controls.Textures.TextureIds import TextureIds
+
+@dataclass
+class FileInfo:
+    name: str
+    date_modified: float  # Epoch time format
+    type: str  # "File" or "Folder"
+    size: Optional[int]  # None for folders
+
+def format_date(timestamp: float) -> str:
+    dt_object = datetime.fromtimestamp(timestamp)
+    return dt_object.strftime('%Y/%m/%d')
+
+def format_size(size_in_bytes: Optional[int]) -> str:
+    if size_in_bytes is None:  # Handle the case for folders
+        return ""
+
+    size_in_kb = size_in_bytes / 1024
+    return "{:,.0f} KB".format(size_in_kb)
 
 def list_files_and_folders(path: str):
     # List all items in the given directory
@@ -35,6 +55,42 @@ def list_files_and_folders(path: str):
         visible_items = [item for item in visible_items if not is_hidden_or_system(os.path.join(path, item))]
 
     return visible_items
+
+def get_file_info(filename: str, folder_path: str) -> dict:
+    full_path = os.path.join(folder_path, filename)
+    file_info = os.stat(full_path)
+    
+    detail = FileInfo(
+        name=filename,
+        date_modified=file_info.st_mtime,
+        type='Folder' if os.path.isdir(full_path) else 'File',  # Simplified type info
+        size=file_info.st_size if os.path.isfile(full_path) else None
+    )
+    
+    return detail
+
+def split_and_sort_file_info(file_info_list: List[FileInfo], sort_key: str = 'name', reverse: bool = False) -> Tuple[List[FileInfo], List[FileInfo]]:
+    """
+    Splits the file_details_list into files and folders, and sorts each by the given sort_key.
+    
+    Parameters:
+    - file_details_list: List of FileDetail objects containing file details.
+    - sort_key: Attribute by which to sort the files and folders. Default is 'name'.
+    - reverse: Whether to reverse the sort order. Default is False.
+
+    Returns:
+    - Tuple containing sorted lists: (sorted_folders, sorted_files)
+    """
+
+    # Split into files and folders
+    folders = [detail for detail in file_info_list if detail.type == 'Folder']
+    files = [detail for detail in file_info_list if detail.type == 'File']
+
+    # Sort each list
+    sorted_folder_info = sorted(folders, key=lambda x: getattr(x, sort_key), reverse=reverse)
+    sorted_file_info = sorted(files, key=lambda x: getattr(x, sort_key), reverse=reverse)
+
+    return sorted_folder_info, sorted_file_info
 
 
 @dataclass
@@ -74,7 +130,7 @@ def fileOpenDialog():
     current_breadcrumbs = path_to_breadcrumbs(current_path)
     breadcrumb_dict = {}  # A dictionary to map DPG IDs to path segments
 
-    ID_FILE_OPEN_DIALOG = dpg.generate_uuid()
+    ID_WINDOW_DIALOG = dpg.generate_uuid()
     ID_GROUP_CONTAINER = dpg.generate_uuid()
     ID_GROUP_HEADER = dpg.generate_uuid()
     ID_GROUP_URL_BAR = dpg.generate_uuid()
@@ -82,7 +138,8 @@ def fileOpenDialog():
     ID_GROUP_FILENAME = dpg.generate_uuid()
     ID_GROUP_FOOTER = dpg.generate_uuid()
     ID_WINDOW_TREELIST = dpg.generate_uuid()
-    ID_WINDOW_LISTBOX = dpg.generate_uuid()
+    ID_WINDOW_LISTDIR = dpg.generate_uuid()
+    ID_GROUP_LISTDIR = dpg.generate_uuid()
 
     ID_BUTTON_ACCEPT = dpg.generate_uuid()
     ID_BUTTON_CANCEL = dpg.generate_uuid()
@@ -106,7 +163,6 @@ def fileOpenDialog():
         nonlocal current_path
         nonlocal current_breadcrumbs
         
-        
         breadcrumbs_to_join  = current_breadcrumbs[:1+breadcrumb_dict[sender].path_index]
         path_segments = [breadcrumb.path_segment for breadcrumb in breadcrumbs_to_join]
 
@@ -114,6 +170,7 @@ def fileOpenDialog():
         current_breadcrumbs = path_to_breadcrumbs(current_path)
 
         _update_breadcrumbs()
+        _update_listdir()
 
     def _update_breadcrumbs():
         nonlocal breadcrumb_dict
@@ -138,6 +195,54 @@ def fileOpenDialog():
         # button to activate textbox input
         dpg.add_button(parent=ID_GROUP_URL_BAR, width=-1)
 
+    def _update_listdir():
+        for item in dpg.get_item_children(ID_GROUP_LISTDIR, 1):
+            dpg.delete_item(item)
+        
+        visible_items = list_files_and_folders(current_path)
+        file_info_list = [get_file_info(item, current_path) for item in visible_items]
+        folder_infos, file_infos = split_and_sort_file_info(file_info_list)
+
+        def _sort_callback(sender, sort_specs):
+            # this probably belongs in DpgHelpers, but for now:
+            
+            # No sorting case
+            if sort_specs is None:
+                return
+
+            cols = dpg.get_item_children(sender, 0)
+            rows = dpg.get_item_children(sender, 1)
+
+            column_id, direction = sort_specs[0]
+            column_idx = cols.index(column_id)
+            
+            # Create a list that can be sorted based on the specified cell
+            sortable_list = []
+            for row in rows:
+                cell = dpg.get_item_children(row, 1)[column_idx]
+                # assuming that the table cell holds a selectable...
+                sortable_list.append([row, dpg.get_item_label(cell)])
+            
+            # Sort based on the value in the specified column
+            sortable_list.sort(key=lambda x: x[1], reverse=direction < 0)
+            # Create a list of sorted row ids
+            new_order = [pair[0] for pair in sortable_list]
+            
+            dpg.reorder_items(sender, 1, new_order)
+
+        with dpg.table(parent=ID_GROUP_LISTDIR,
+                      header_row=True, row_background=True,
+                      resizable=True, reorderable=True, hideable=True, 
+                      sortable=True, context_menu_in_body=True, callback=_sort_callback):
+            dpg.add_table_column(label='Name', init_width_or_weight=4, no_hide=True)
+            dpg.add_table_column(label='Date Modified', init_width_or_weight=2)
+            dpg.add_table_column(label='Size', init_width_or_weight=1, )
+
+            for item in [*folder_infos, *file_infos]:
+                with dpg.table_row():
+                    dpg.add_selectable(label=item.name)
+                    dpg.add_selectable(label=format_date(item.date_modified))
+                    dpg.add_selectable(label=format_size(item.size))
 
     # add double click handler
     with dpg.item_handler_registry(tag=ID_HANDLER_DOUBLE_CLICK):
@@ -178,13 +283,13 @@ def fileOpenDialog():
         _on_close()
 
     def _on_close():
-        dpg.delete_item(ID_FILE_OPEN_DIALOG)
+        dpg.delete_item(ID_WINDOW_DIALOG)
         dpg.delete_item(ID_THEME_ICON_BUTTON)
 
-    with dpg.window(tag=ID_FILE_OPEN_DIALOG, 
+    with dpg.window(tag=ID_WINDOW_DIALOG, 
                     label="Open",
                     no_close=False, modal=False, no_collapse=True,
-                    width=426, height=310):
+                    width=560, height=310):
         
         with dpg.group(tag=ID_GROUP_CONTAINER, horizontal=False):
             with dpg.group(tag=ID_GROUP_HEADER, horizontal=True):
@@ -194,8 +299,8 @@ def fileOpenDialog():
                 # dpg.add_input_text(default_value="Documents", width=-1)
 
                 dpg.add_group(id=ID_GROUP_URL_BAR, horizontal=True)
+                
                 _update_breadcrumbs()
-
                 dpg.bind_item_theme(ID_GROUP_URL_BAR, ID_THEME_NOSPACING)
 
             # dpg.add_separator()
@@ -227,19 +332,14 @@ def fileOpenDialog():
                             dpg.add_button(label="Projects")
                             dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
                 
-                
-                items = list_files_and_folders(current_path)
-
                 # folder contents
-                with dpg.child_window(tag=ID_WINDOW_LISTBOX, width=-1, height=200):
+                with dpg.child_window(tag=ID_WINDOW_LISTDIR, width=-1, height=200):
                     
-                    # dpg.add_listbox(items, num_items=9, width=-1)
-                    with dpg.group(horizontal=False):
-                        for item in items:
-                            dpg.add_selectable(label=item)
+                    dpg.add_group(id=ID_GROUP_LISTDIR, horizontal=False)
+                    _update_listdir()
                 
                 dpg.bind_item_theme(ID_WINDOW_TREELIST, ID_THEME_LISTBOX)
-                dpg.bind_item_theme(ID_WINDOW_LISTBOX, ID_THEME_LISTBOX)
+                dpg.bind_item_theme(ID_WINDOW_LISTDIR, ID_THEME_LISTBOX)
 
             # set theming here to add a gap
             with dpg.group(tag=ID_GROUP_FILENAME, horizontal=True):
