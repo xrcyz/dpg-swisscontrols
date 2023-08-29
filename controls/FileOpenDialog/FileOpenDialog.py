@@ -16,6 +16,13 @@ class FileInfo:
     type: str  # "File" or "Folder"
     size: Optional[int]  # None for folders
 
+@dataclass
+class FolderButtonInfo:
+    path: str
+    folder_btn_id: str = None
+    caption_btn_id: str = None
+    indent_level: int = 0
+
 def format_date(timestamp: float) -> str:
     dt_object = datetime.fromtimestamp(timestamp)
     return dt_object.strftime('%Y/%m/%d')
@@ -26,6 +33,13 @@ def format_size(size_in_bytes: Optional[int]) -> str:
 
     size_in_kb = size_in_bytes / 1024
     return "{:,.0f} KB".format(size_in_kb)
+
+def get_last_folder_or_drive(path):
+    normalized_path = os.path.normpath(path)
+    base_name = os.path.basename(normalized_path)
+    if not base_name and os.path.splitdrive(normalized_path)[0]:
+        return '(' + normalized_path.replace('\\', '') + ')'
+    return base_name
 
 def list_files_and_folders(path: str):
     # List all items in the given directory
@@ -129,6 +143,7 @@ def fileOpenDialog():
     current_path = DEFAULT_PATH
     current_breadcrumbs = path_to_breadcrumbs(current_path)
     breadcrumb_dict = {}  # A dictionary to map DPG IDs to path segments
+    folderTreeDict = {}
 
     ID_WINDOW_DIALOG = dpg.generate_uuid()
     ID_GROUP_CONTAINER = dpg.generate_uuid()
@@ -138,6 +153,7 @@ def fileOpenDialog():
     ID_GROUP_FILENAME = dpg.generate_uuid()
     ID_GROUP_FOOTER = dpg.generate_uuid()
     ID_WINDOW_TREELIST = dpg.generate_uuid()
+    ID_GROUP_TREELIST = dpg.generate_uuid()
     ID_WINDOW_LISTDIR = dpg.generate_uuid()
     ID_GROUP_LISTDIR = dpg.generate_uuid()
 
@@ -244,6 +260,42 @@ def fileOpenDialog():
                     dpg.add_selectable(label=format_date(item.date_modified))
                     dpg.add_selectable(label=format_size(item.size))
 
+    def _insert_to_treelist(sender, indent_level: int, path: str):
+        if not indent_level: indent_level = 0
+        if not path: 
+            path = "This PC:"
+            caption = 'New Button'
+        else:
+            caption = get_last_folder_or_drive(path)
+        
+        if not sender:
+            destination_arg = {'parent': ID_GROUP_TREELIST}
+        else:
+            sender_info: FolderButtonInfo = folderTreeDict[sender]
+            indent_level = sender_info.indent_level + 1
+            
+            # the sender is a button inside a group inside a list of groups
+            # we need to insert a group after the current group
+            current_group = dpg.get_item_parent(sender)
+            list_of_groups = dpg.get_item_children(ID_GROUP_TREELIST, 1)
+            sender_idx = list_of_groups.index(current_group) 
+            destination_arg = {}
+            if sender_idx < len(list_of_groups) - 1:
+                destination_arg['before'] = list_of_groups[sender_idx+1]
+            else:
+                destination_arg['parent'] = ID_GROUP_TREELIST
+        
+        with dpg.group(horizontal=True, **destination_arg):
+            icon_btn = dpg.add_image_button(texture_tag=ID_TEX_FOLDER_ICON, 
+                                 height=19, width=19, indent=indent_level*8,
+                                 callback=_insert_to_treelist)
+            dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
+            caption_btn = dpg.add_button(label=caption)
+            dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
+
+            folderButtonInfo = FolderButtonInfo(path=path, folder_btn_id=icon_btn, caption_btn_id=caption_btn, indent_level=indent_level)
+            folderTreeDict[icon_btn] = folderButtonInfo
+
     # add double click handler
     with dpg.item_handler_registry(tag=ID_HANDLER_DOUBLE_CLICK):
         dpg.add_item_double_clicked_handler(callback=_on_double_click)
@@ -309,28 +361,12 @@ def fileOpenDialog():
                 # folder tree
                 with dpg.child_window(tag=ID_WINDOW_TREELIST,
                                       width=142, height=200):
-                    with dpg.group(horizontal=False):
+                    with dpg.group(horizontal=False, tag=ID_GROUP_TREELIST):
                     
-                        with dpg.group(horizontal=True):
-                            dpg.add_image_button(texture_tag=ID_TEX_FOLDER_ICON, height=19, width=19)
-                            dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
-                            dpg.add_button(label="This PC:")
-                            dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
-                        with dpg.group(horizontal=True):
-                            dpg.add_image_button(texture_tag=ID_TEX_FOLDER_ICON, height=19, width=19, indent=8)
-                            dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
-                            dpg.add_button(label="(D:)")
-                            dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
-                        with dpg.group(horizontal=True):
-                            dpg.add_image_button(texture_tag=ID_TEX_FOLDER_ICON, height=19, width=19, indent=16)
-                            dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
-                            dpg.add_button(label="Documents")
-                            dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
-                        with dpg.group(horizontal=True):
-                            dpg.add_image_button(texture_tag=ID_TEX_FOLDER_ICON, height=19, width=19, indent=16)
-                            dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
-                            dpg.add_button(label="Projects")
-                            dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
+                        _insert_to_treelist(None, indent_level=0, path=None)
+                        _insert_to_treelist(None, indent_level=1, path="D:/")
+                        _insert_to_treelist(None, indent_level=2, path="D:/DPG")
+                        _insert_to_treelist(None, indent_level=3, path="D:/DPG/Projects")
                 
                 # folder contents
                 with dpg.child_window(tag=ID_WINDOW_LISTDIR, width=-1, height=200):
