@@ -306,11 +306,12 @@ def fileOpenDialog():
                                     height=19, width=19, indent=indent_level*8,
                                     callback=_update_treelist)
                 dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
-                caption_btn = dpg.add_button(label=caption)
+                caption_btn = dpg.add_button(label=caption, callback=_on_treelist_folder_click)
                 dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
 
                 folderButtonInfo = FolderButtonInfo(path=path, folder_btn_id=icon_btn, caption_btn_id=caption_btn, indent_level=indent_level)
                 folderTreeDict[icon_btn] = folderButtonInfo
+                folderTreeDict[caption_btn] = folderButtonInfo
         else:
             sender_info: FolderButtonInfo = folderTreeDict[sender]
             parent_indent_level = sender_info.indent_level
@@ -360,11 +361,17 @@ def fileOpenDialog():
                                             height=19, width=19, indent=child_indent_level*8,
                                             callback=_update_treelist)
                         dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
-                        caption_btn = dpg.add_button(label=child_folder)
+                        caption_btn = dpg.add_button(label=child_folder, callback=_on_treelist_folder_click)
                         dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
 
                         folderButtonInfo = FolderButtonInfo(path=child_path, folder_btn_id=icon_btn, caption_btn_id=caption_btn, indent_level=child_indent_level)
                         folderTreeDict[icon_btn] = folderButtonInfo
+                        folderTreeDict[caption_btn] = folderButtonInfo
+
+    def _on_treelist_folder_click(sender):
+        nonlocal current_path
+        current_path = folderTreeDict[sender].path # 'D:/DPG'
+        _update_listdir()
 
     # add double click handler
     with dpg.item_handler_registry(tag=ID_HANDLER_DOUBLE_CLICK):
