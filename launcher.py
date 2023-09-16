@@ -16,9 +16,9 @@ relative to `my_file.py`, it is relative to wherever the process was initiated.
 
 """
 
-# import examples.demo_ListEdtCtrl
-# import examples.demo_CheckListCtrl
+# import src.swisscontrols.examples.demo_ListEdtCtrl
+# import src.swisscontrols.examples.demo_CheckListCtrl
 
-# import controls.PivotCtrl.demo_PivotCtrl
+# import src.swisscontrols.controls.PivotCtrl.demo_PivotCtrl
 
-import controls.FileOpenDialog.FileOpenDialog
+import src.swisscontrols.controls.FileOpenDialog.FileOpenDialog

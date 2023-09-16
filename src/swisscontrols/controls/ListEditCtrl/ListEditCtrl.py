@@ -1,7 +1,7 @@
 from typing import List, Dict, Tuple, Callable
 import dearpygui.dearpygui as dpg
-from controls.ListEditCtrl.DataGrid import DataGrid
-from controls.ListEditCtrl.TableHelpers import swap_row_values
+from swisscontrols.controls.ListEditCtrl.DataGrid import DataGrid
+from swisscontrols.controls.ListEditCtrl.TableHelpers import swap_row_values
 
 def listEditCtrlDialog(grid: DataGrid, send_grid: Callable[[DataGrid], None]):
     """

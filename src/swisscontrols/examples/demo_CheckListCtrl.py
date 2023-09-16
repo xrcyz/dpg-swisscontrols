@@ -1,7 +1,7 @@
 
 import dearpygui.dearpygui as dpg
 import numpy as np 
-from controls.CheckListCtrl.CheckListCtrl import checkListCtrl
+from swisscontrols.controls.CheckListCtrl.CheckListCtrl import checkListCtrl
 
 data = []
 for i in range(12):

@@ -3,11 +3,11 @@ from typing import List, Tuple, Callable
 from enum import Enum
 import dataclasses
 
-from controls.DpgHelpers.MvItemTypes import MvItemTypes
-from controls.DpgHelpers.MvStyleVar import MvStyleVar
-from controls.Textures.TextureIds import TextureIds
-from controls.UserScripts.user_scripts import create_lambda_from_checklist, create_lambda_from_expression
-from controls.PivotCtrl.PivotField import PivotFieldType
+from swisscontrols.controls.DpgHelpers.MvItemTypes import MvItemTypes
+from swisscontrols.controls.DpgHelpers.MvStyleVar import MvStyleVar
+from swisscontrols.controls.Textures.TextureIds import TextureIds
+from swisscontrols.controls.UserScripts.user_scripts import create_lambda_from_checklist, create_lambda_from_expression
+from swisscontrols.controls.PivotCtrl.PivotField import PivotFieldType
 
 
 @dataclasses.dataclass

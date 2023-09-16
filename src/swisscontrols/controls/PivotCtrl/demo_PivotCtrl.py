@@ -7,15 +7,15 @@ import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
 
-from controls.DpgHelpers.MvItemTypes import MvItemTypes
-from controls.DpgHelpers.MvThemeCol import MvThemeCol
-from controls.DpgHelpers.Layouts import calc_single_window_height_from_items, calc_multi_window_height_in_table_rows
-from controls.Textures.TextureIds import TextureIds
-from controls.GridSelector.GridSelector import GridSelector
-from controls.PivotCtrl.PivotBroker import PivotBroker
-from controls.PivotCtrl.PivotField import PivotFieldType 
-from controls.CheckListCtrl.CheckListCtrl import checkListCtrl
-from controls.PivotCtrl.PivotFilter import PivotFilterButton, pivotFilterDialog
+from swisscontrols.controls.DpgHelpers.MvItemTypes import MvItemTypes
+from swisscontrols.controls.DpgHelpers.MvThemeCol import MvThemeCol
+from swisscontrols.controls.DpgHelpers.Layouts import calc_single_window_height_from_items, calc_multi_window_height_in_table_rows
+from swisscontrols.controls.Textures.TextureIds import TextureIds
+from swisscontrols.controls.GridSelector.GridSelector import GridSelector
+from swisscontrols.controls.PivotCtrl.PivotBroker import PivotBroker
+from swisscontrols.controls.PivotCtrl.PivotField import PivotFieldType 
+from swisscontrols.controls.CheckListCtrl.CheckListCtrl import checkListCtrl
+from swisscontrols.controls.PivotCtrl.PivotFilter import PivotFilterButton, pivotFilterDialog
 
 """
 DONE

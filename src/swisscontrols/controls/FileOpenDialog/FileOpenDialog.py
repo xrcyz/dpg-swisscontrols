@@ -5,16 +5,20 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
 
-from controls.DpgHelpers.MvThemeCol import MvThemeCol
-from controls.DpgHelpers.MvStyleVar import MvStyleVar
-from controls.Textures.TextureIds import TextureIds
+from swisscontrols.controls.DpgHelpers.MvThemeCol import MvThemeCol
+from swisscontrols.controls.DpgHelpers.MvStyleVar import MvStyleVar
+from swisscontrols.controls.Textures.TextureIds import TextureIds
 
-@dataclass
-class FileInfo:
-    name: str
-    date_modified: float  # Epoch time format
-    type: str  # "File" or "Folder"
-    size: Optional[int]  # None for folders
+from swisscontrols.controls.Utilities.mouse_utils import ClickHandler
+from swisscontrols.controls.Utilities.path_utils import \
+    FileInfo, \
+    Breadcrumb, \
+    list_folders, \
+    list_files_and_folders, \
+    split_and_sort_file_info, \
+    get_file_info, \
+    get_last_folder_or_drive, \
+    path_to_breadcrumbs
 
 @dataclass
 class FolderButtonInfo:
@@ -34,134 +38,6 @@ def format_size(size_in_bytes: Optional[int]) -> str:
     size_in_kb = size_in_bytes / 1024
     return "{:,.0f} KB".format(size_in_kb)
 
-def get_last_folder_or_drive(path):
-    normalized_path = os.path.normpath(path)
-    base_name = os.path.basename(normalized_path)
-    if not base_name and os.path.splitdrive(normalized_path)[0]:
-        return '(' + normalized_path.replace('\\', '') + ')'
-    return base_name
-
-def list_folders(path: str):
-    # List all items in the given directory
-    all_items = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
-
-    # Filter out hidden files and folders (Unix-like systems)
-    visible_items = [item for item in all_items if not item.startswith('.')]
-
-    # For Windows: further filter out system and hidden files/folders
-    if os.name == 'nt':
-        import ctypes
-
-        FILE_ATTRIBUTE_HIDDEN = 0x2
-        FILE_ATTRIBUTE_SYSTEM = 0x4
-
-        def is_hidden_or_system(filepath: str) -> bool:
-            try:
-                attrs = ctypes.windll.kernel32.GetFileAttributesW(filepath)
-                if attrs == -1:  # Invalid attributes
-                    # print(f"Invalid attributes for: {filepath}")
-                    return True  # Default to hidden
-                return (attrs & FILE_ATTRIBUTE_HIDDEN) or (attrs & FILE_ATTRIBUTE_SYSTEM)
-            except Exception as e:
-                print(f"Exception for {filepath}: {e}")
-                return True  # Default to hidden
-
-        visible_items = [item for item in visible_items if not is_hidden_or_system(os.path.join(path, item))]
-
-    return visible_items
-
-def list_files_and_folders(path: str):
-    # List all items in the given directory
-    all_items = os.listdir(path)
-
-    # Filter out hidden files and folders (Unix-like systems)
-    visible_items = [item for item in all_items if not item.startswith('.')]
-
-    # For Windows: further filter out system and hidden files/folders
-    if os.name == 'nt':
-        import ctypes
-
-        FILE_ATTRIBUTE_HIDDEN = 0x2
-        FILE_ATTRIBUTE_SYSTEM = 0x4
-
-        def is_hidden_or_system(filepath: str) -> bool:
-            try:
-                attrs = ctypes.windll.kernel32.GetFileAttributesW(filepath)
-                if attrs == -1:  # Invalid attributes
-                    # print(f"Invalid attributes for: {filepath}")
-                    return True  # Default to hidden
-                return (attrs & FILE_ATTRIBUTE_HIDDEN) or (attrs & FILE_ATTRIBUTE_SYSTEM)
-            except Exception as e:
-                print(f"Exception for {filepath}: {e}")
-                return True  # Default to hidden
-
-        visible_items = [item for item in visible_items if not is_hidden_or_system(os.path.join(path, item))]
-
-    return visible_items
-
-def get_file_info(filename: str, folder_path: str) -> dict:
-    full_path = os.path.join(folder_path, filename)
-    file_info = os.stat(full_path)
-    
-    detail = FileInfo(
-        name=filename,
-        date_modified=file_info.st_mtime,
-        type='Folder' if os.path.isdir(full_path) else 'File',  # Simplified type info
-        size=file_info.st_size if os.path.isfile(full_path) else None
-    )
-    
-    return detail
-
-def split_and_sort_file_info(file_info_list: List[FileInfo], sort_key: str = 'name', reverse: bool = False) -> Tuple[List[FileInfo], List[FileInfo]]:
-    """
-    Splits the file_details_list into files and folders, and sorts each by the given sort_key.
-    
-    Parameters:
-    - file_details_list: List of FileDetail objects containing file details.
-    - sort_key: Attribute by which to sort the files and folders. Default is 'name'.
-    - reverse: Whether to reverse the sort order. Default is False.
-
-    Returns:
-    - Tuple containing sorted lists: (sorted_folders, sorted_files)
-    """
-
-    # Split into files and folders
-    folders = [detail for detail in file_info_list if detail.type == 'Folder']
-    files = [detail for detail in file_info_list if detail.type == 'File']
-
-    # Sort each list
-    sorted_folder_info = sorted(folders, key=lambda x: getattr(x, sort_key), reverse=reverse)
-    sorted_file_info = sorted(files, key=lambda x: getattr(x, sort_key), reverse=reverse)
-
-    return sorted_folder_info, sorted_file_info
-
-
-@dataclass
-class Breadcrumb:
-    path_index: int
-    path_segment: str
-
-def path_to_breadcrumbs(path: str) -> list[Breadcrumb]:
-    # Handle the special case for Windows drive letters
-    if os.name == "nt" and len(path) > 1 and path[1] == ":":
-        path = path[0] + path[1] + path[2:].replace(":", "")
-        path_segments = [segment for segment in path.split(os.sep) if segment]
-        # Format the drive letter
-        if len(path_segments) > 0 and ":" in path_segments[0]:
-            drive_letter = path_segments[0][0]
-            display_segment = f"({drive_letter}:)"
-            path_segments[0] = drive_letter + ":\\"
-        else:
-            display_segment = path_segments[0]
-    else:
-        path_segments = [segment for segment in path.split(os.sep) if segment]
-        display_segment = os.sep if path.startswith(os.sep) else path_segments[0]
-
-    breadcrumbs = [Breadcrumb(path_index=i, path_segment=segment) 
-                   for i, segment in enumerate(path_segments)]
-    
-    return breadcrumbs
-
 def fileOpenDialog():
 
     HOME_PATH = os.path.expanduser("~")
@@ -171,8 +47,8 @@ def fileOpenDialog():
     
     current_path = DEFAULT_PATH
     current_breadcrumbs = path_to_breadcrumbs(current_path)
-    breadcrumb_dict = {}  # A dictionary to map DPG IDs to path segments
-    folderTreeDict = {}
+    breadcrumb_dict = {} # dictionary to lookup Breadcrumb info from URL bar clicks
+    folderTreeDict = {} # dictionary to lookup FolderButtonInfo from folder tree click
 
     ID_WINDOW_DIALOG = dpg.generate_uuid()
     ID_GROUP_CONTAINER = dpg.generate_uuid()
@@ -202,7 +78,19 @@ def fileOpenDialog():
     URL_BAR_SEPARATOR = ' > '
     
     def _on_double_click(sender, app_data):
-        print("double clicked")
+        # sender: the double click handler
+        # app_data: an array with the double clicked item id at index 1
+
+        # double click on treelist folder icon
+        
+        # double click on treelist folder caption
+        if app_data[1] in folderTreeDict and folderTreeDict[app_data[1]].caption_btn_id == app_data[1]:
+            _update_treelist(app_data[1], indent_level=None, path=None)
+
+    # add double click handler
+    with dpg.item_handler_registry(tag=ID_HANDLER_DOUBLE_CLICK):
+        dpg.add_item_double_clicked_handler(callback=_on_double_click)
+
 
     def _on_breadcrumb_click(sender):
         nonlocal current_path
@@ -304,10 +192,12 @@ def fileOpenDialog():
             with dpg.group(horizontal=True, **destination_arg):
                 icon_btn = dpg.add_image_button(texture_tag=ID_TEX_FOLDER_ICON, 
                                     height=19, width=19, indent=indent_level*8,
-                                    callback=_update_treelist)
-                dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
-                caption_btn = dpg.add_button(label=caption, callback=_on_treelist_folder_click)
-                dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
+                                    callback=_on_treelist_folder_callback)
+                dpg.bind_item_theme(icon_btn, ID_THEME_ICON_BUTTON)
+                caption_btn = dpg.add_button(label=caption, callback=_on_treelist_caption_click)
+                
+                dpg.bind_item_handler_registry(icon_btn, ID_HANDLER_DOUBLE_CLICK)
+                dpg.bind_item_handler_registry(caption_btn, ID_HANDLER_DOUBLE_CLICK)
 
                 folderButtonInfo = FolderButtonInfo(path=path, folder_btn_id=icon_btn, caption_btn_id=caption_btn, indent_level=indent_level)
                 folderTreeDict[icon_btn] = folderButtonInfo
@@ -359,23 +249,35 @@ def fileOpenDialog():
                     with dpg.group(horizontal=True, **destination_arg):
                         icon_btn = dpg.add_image_button(texture_tag=ID_TEX_FOLDER_ICON, 
                                             height=19, width=19, indent=child_indent_level*8,
-                                            callback=_update_treelist)
-                        dpg.bind_item_theme(dpg.last_item(), ID_THEME_ICON_BUTTON)
-                        caption_btn = dpg.add_button(label=child_folder, callback=_on_treelist_folder_click)
-                        dpg.bind_item_handler_registry(dpg.last_item(), ID_HANDLER_DOUBLE_CLICK)
+                                            callback=_on_treelist_folder_callback)
+                        dpg.bind_item_theme(icon_btn, ID_THEME_ICON_BUTTON)
+                        caption_btn = dpg.add_button(label=child_folder, callback=_on_treelist_caption_click)
+
+                        dpg.bind_item_handler_registry(icon_btn, ID_HANDLER_DOUBLE_CLICK)
+                        dpg.bind_item_handler_registry(caption_btn, ID_HANDLER_DOUBLE_CLICK)
 
                         folderButtonInfo = FolderButtonInfo(path=child_path, folder_btn_id=icon_btn, caption_btn_id=caption_btn, indent_level=child_indent_level)
                         folderTreeDict[icon_btn] = folderButtonInfo
                         folderTreeDict[caption_btn] = folderButtonInfo
 
-    def _on_treelist_folder_click(sender):
-        nonlocal current_path
-        current_path = folderTreeDict[sender].path # 'D:/DPG'
-        _update_listdir()
+    def _on_treelist_folder_single_click(sender):
+        # on single click: expand folder
+        _update_treelist(sender, None, None)
 
-    # add double click handler
-    with dpg.item_handler_registry(tag=ID_HANDLER_DOUBLE_CLICK):
-        dpg.add_item_double_clicked_handler(callback=_on_double_click)
+    def _on_treelist_folder_double_click(sender):
+        # on double click: expand folder
+        _update_treelist(sender, None, None)
+
+    click_handler = ClickHandler(_on_treelist_folder_single_click, _on_treelist_folder_double_click)
+
+    def _on_treelist_folder_callback(sender):
+        click_handler.handle_click(sender)
+
+    def _on_treelist_caption_click(sender):
+        nonlocal current_path
+        if current_path != folderTreeDict[sender].path:
+            current_path = folderTreeDict[sender].path # 'D:/DPG'
+            _update_listdir()
 
     def _register_themes():
         with dpg.theme(tag=ID_THEME_ICON_BUTTON):

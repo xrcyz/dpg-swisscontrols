@@ -6,9 +6,9 @@ from typing import List, Dict, Callable
 import pandas as pd
 import numpy as np
 
-from controls.PivotCtrl.DataSource import get_flat_data, get_field_data
-from controls.PivotCtrl.PivotField import PivotField, PivotFieldType
-from controls.UserScripts.user_scripts import create_combined_lambdas
+from swisscontrols.controls.PivotCtrl.DataSource import get_flat_data, get_field_data
+from swisscontrols.controls.PivotCtrl.PivotField import PivotField, PivotFieldType
+from swisscontrols.controls.UserScripts.user_scripts import create_combined_lambdas
 
 class PivotBroker:
     # mediator between PivotCtrl and DataSource

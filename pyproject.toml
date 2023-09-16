@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "swisscontrols"
+description = "Some widgets for DearPyGui"
+readme = "README.md"
+
+version = "0.0.2"
+
+requires-python = ">=3.10"
+dependencies = [
+  "DearPyGui",
+  "Pandas",
+  "Numpy",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/xrcyz/dpg-swisscontrols"
+"Bug Tracker" = "https://github.com/xrcyz/dpg-swisscontrols/issues"

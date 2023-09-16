@@ -1,7 +1,7 @@
 
 from typing import List, Dict
 
-from controls.DpgHelpers.MvStyleVar import MvStyleVar
+from swisscontrols.controls.DpgHelpers.MvStyleVar import MvStyleVar
 
 # this needs to be more than it is
 # a tree of windows and elements where you can recursively call height and sum the lot

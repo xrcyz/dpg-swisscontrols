@@ -7,8 +7,8 @@ class TexInfo:
 
 
 class TextureIds:
-    ID_PARTIAL_CHECK =  TexInfo(UUID='tx1', PATH='controls/assets/icon_partial_check.png')
-    ID_ICON_FOLDER = TexInfo(UUID='tx2', PATH='controls/assets/icon_folder.png')
+    ID_PARTIAL_CHECK =  TexInfo(UUID='tx1', PATH='src/swisscontrols/controls/assets/icon_partial_check.png')
+    ID_ICON_FOLDER = TexInfo(UUID='tx2', PATH='src/swisscontrols/controls/assets/icon_folder.png')
 
     def __init__(self):
         raise RuntimeError("TextureIds should not be instantiated")
